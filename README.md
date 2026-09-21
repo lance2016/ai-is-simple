@@ -1,85 +1,238 @@
+<div align="center">
+
+<img src="./assets/readme-hero.png" alt="AI 如此简单" width="100%" />
+
 # AI 如此简单
 
-> 一句话、一幅图、一小段代码，把一个 AI 概念讲明白。
+**一张图 + 一句话 + 一小段代码，把一个 AI Agent 概念真正讲明白。**
 
-这是一个面向初学者的 AI 学习笔记项目。
+面向刚开始学习 **AI / LLM / Agent** 的开发者。  
+不堆术语，不先上框架，从最小 Agent Loop 开始，一层一层搭出完整 Agent。
 
-项目受到 [shareAI-lab/learn-claude-code](https://github.com/shareAI-lab/learn-claude-code) 启发，并以它的学习主线为参考，再用更少的术语、更直观的图和生活化的例子重新解释。
+</div>
 
-这里不追求一次讲完所有细节，而是希望每一章先回答一个简单问题：
+---
 
-> **看完这张图，我能不能用自己的话解释它？**
+## 这是什么？
 
-## 默认技术栈
+很多 Agent 教程一上来就是框架、配置和几十个概念。
 
-为了让示例容易复现，代码默认使用：
+这个项目反过来：
 
-- 模型：DeepSeek，默认值为 `deepseek-flash`；
-- SDK：OpenAI Python SDK；
-- API：DeepSeek 的 OpenAI 兼容接口；
-- 配置：通过 `.env` 文件读取 API Key。
+> **先理解最小原理，再逐步增加能力。**
 
-如果你的账号使用其他模型，只需要修改 `DEEPSEEK_MODEL`。
+每一章只解决一个问题：
 
-## 每一章怎么读
+1. **先看图**：建立直觉；
+2. **一句话理解**：先抓住核心；
+3. **生活化例子**：把抽象概念落地；
+4. **一小段代码**：真正跑起来。
 
-每章都尽量保持同一种节奏：
+最终你会从一个最小循环，逐渐理解：
 
-1. 先看一幅图，建立整体印象；
-2. 先用一句话说结论；
-3. 用几个短段落和一个生活例子展开；
-4. 最后看一小段 DeepSeek + OpenAI SDK 代码。
+**Tool → Permission → Planning → Subagents → Skills → Context → Memory → Tasks → MCP → Agent Teams → Harness → Workflow**
 
-尽量不写大段说教文字。每章只讲一个核心概念。
+---
 
-## 第一次运行
+## 一张图看懂这门课
 
-```bash
-cd /Users/lance/Desktop/ai-is-simple
-python3 -m venv .venv
-source .venv/bin/activate
-pip install -r requirements.txt
-cp .env.example .env
-# 编辑 .env，填入 DEEPSEEK_API_KEY
-python chapters/01-agent-loop/code.py
+<img src="./assets/learning-roadmap.png" alt="AI Agent 学习路线" width="100%" />
+
+可以把一个成熟 Agent 想成不断升级的小助手：
+
+> **会思考 → 会使用工具 → 会规划 → 会记忆 → 会协作 → 会长期运行**
+
+所有复杂 Agent，最后都建立在同一个最小循环上：
+
+```text
+用户任务
+   ↓
+模型决定下一步
+   ↓
+需要工具？ ── 否 ──→ 输出答案
+   │
+   是
+   ↓
+执行工具
+   ↓
+工具结果返回模型
+   └────────────→ 再次决定
 ```
+
+---
 
 ## 学习路线
 
-| 章节 | 主题 | 先记住一句话 |
-| --- | --- | --- |
-| 01 | Agent Loop | 模型决定下一步，工具负责把它做出来 |
-| 02 | Tool Use | 工具越清晰，模型越容易正确行动 |
-| 03 | Permission | 能做什么，也要判断该不该做 |
-| 04 | Hooks | 在工具前后留接口，系统才能持续扩展 |
-| 05 | Planning | 没有计划的 Agent，容易走哪算哪 |
-| 06 | Subagents | 大任务拆小，每个子任务拥有干净上下文 |
-| 07 | Skill Loading | 用到时再加载知识，不要一开始全塞进去 |
-| 08 | Context Compact | 上下文总会变满，要学会腾出空间 |
-| 09 | Memory | 记住重要的，忘掉不重要的 |
-| 10 | Tasks | 把大目标拆成可追踪的小任务 |
-| 11 | Background Tasks | 慢操作放到后台，Agent 可以继续思考 |
-| 12 | Cron | 让任务在未来自动发生 |
-| 13 | Agent Teams | 一个 Agent 顾不过来，就让队友分工 |
-| 14 | MCP | 把外部能力接进同一个工具池 |
-| 15 | Agent Harness | 多种机制，仍然围绕同一个循环 |
-| 16 | Workflow Runtime | 固定的编排形状，可以沉淀成流程 |
-| 17 | Goal Loop | 目标决定循环什么时候真正结束 |
+目前已完成 **2 / 17** 章。
 
-目前已完成第 01、02 章，后续章节会逐步补充。
+| 状态 | 章节 | 核心概念 | 只记住一句话 |
+| --- | --- | --- | --- |
+| ✅ | [01 · Agent Loop](./chapters/01-agent-loop/) | Agent 的最小循环 | 模型决定下一步，工具负责执行 |
+| ✅ | [02 · Tool Use](./chapters/02-tool-use/) | 工具调用与分发 | 加工具，不需要重写整个循环 |
+| ⏳ | 03 · Permission | 权限 | 能做，不代表应该直接做 |
+| ⏳ | 04 · Hooks | 扩展点 | 在关键位置留下可插拔接口 |
+| ⏳ | 05 · Planning | 计划 | 复杂任务先拆，再执行 |
+| ⏳ | 06 · Subagents | 子 Agent | 大任务拆小，并隔离上下文 |
+| ⏳ | 07 · Skill Loading | 技能加载 | 用到什么，再加载什么 |
+| ⏳ | 08 · Context Compact | 上下文压缩 | 上下文有限，要主动腾空间 |
+| ⏳ | 09 · Memory | 记忆 | 重要信息跨对话保留下来 |
+| ⏳ | 10 · Tasks | 任务管理 | 把目标变成可追踪的步骤 |
+| ⏳ | 11 · Background Tasks | 后台任务 | 慢任务不应该阻塞 Agent |
+| ⏳ | 12 · Cron | 定时任务 | 让任务在未来自动发生 |
+| ⏳ | 13 · Agent Teams | 多 Agent 协作 | 一个 Agent 忙不过来，就分工 |
+| ⏳ | 14 · MCP | 外部能力协议 | 用统一方式连接外部工具 |
+| ⏳ | 15 · Agent Harness | Agent 运行底座 | 把工具、上下文、权限和执行组织起来 |
+| ⏳ | 16 · Workflow Runtime | 工作流 | 把稳定的编排方式沉淀成流程 |
+| ⏳ | 17 · Goal Loop | 目标循环 | 目标决定 Agent 什么时候真正结束 |
 
-- [第 01 章：Agent Loop](./chapters/01-agent-loop/)
-- [第 02 章：Tool Use](./chapters/02-tool-use/)
+> 不需要一次理解全部概念。  
+> **按顺序学习即可，每一章都建立在前一章之上。**
+
+---
+
+## 5 分钟跑起来
+
+### 1. 克隆项目
+
+```bash
+git clone https://github.com/lance2016/ai-is-simple.git
+cd ai-is-simple
+```
+
+### 2. 创建 Python 环境
+
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+```
+
+Windows PowerShell：
+
+```powershell
+.venv\Scripts\Activate.ps1
+```
+
+### 3. 配置模型
+
+```bash
+cp .env.example .env
+```
+
+然后填写：
+
+```env
+DEEPSEEK_API_KEY=你的_api_key
+DEEPSEEK_BASE_URL=https://api.deepseek.com
+DEEPSEEK_MODEL=deepseek-flash
+```
+
+### 4. 运行第一章
+
+```bash
+python chapters/01-agent-loop/code.py
+```
+
+从这里开始，你已经拥有一个最小可运行 Agent。
+
+---
+
+## 每章都长什么样？
+
+```text
+主图
+ ↓
+一句话总结
+ ↓
+生活化解释
+ ↓
+最小可运行代码
+ ↓
+今天只记住
+ ↓
+一个思考题
+```
+
+项目刻意避免两件事：
+
+- ❌ 一开始堆大量框架 API；
+- ❌ 用十几个术语解释另一个术语。
+
+更希望你最后能做到：
+
+> **合上文档，也能用自己的话解释这个概念。**
+
+---
+
+## 项目结构
+
+```text
+ai-is-simple/
+├── README.md
+├── Agents.md
+├── STYLE_GUIDE.md
+├── SOURCES.md
+├── requirements.txt
+├── .env.example
+└── chapters/
+    ├── 01-agent-loop/
+    │   ├── README.md
+    │   ├── code.py
+    │   └── assets/
+    └── 02-tool-use/
+        ├── README.md
+        └── code.py
+```
+
+每个章节都是一个独立的小单元：
+
+**README 负责讲明白，代码负责跑明白。**
+
+---
+
+## 默认技术栈
+
+为了降低学习成本，项目尽量保持统一：
+
+- **Python**
+- **DeepSeek**
+- **OpenAI Python SDK**
+- **OpenAI-compatible API**
+- `.env` 管理本地配置
+
+重点不是某个模型或框架，而是理解 **Agent 背后的通用机制**。
+
+---
+
+## 适合谁？
+
+如果你：
+
+- 刚开始学习 AI Agent；
+- 会一点 Python，但对 Agent 架构没有完整心智模型；
+- 用过 LangChain / LangGraph / Claude Code，却想知道底层到底发生了什么；
+- 正在准备 AI 应用开发 / Agent 工程相关面试；
+
+这个项目就是为这种学习方式准备的。
+
+---
 
 ## 项目边界
 
-这是个人学习笔记，不是原项目的官方文档，也不代表原作者观点。概念、章节顺序和部分术语参考原项目；插画、文字和解释会根据初学者阅读体验重新组织。
+这是个人学习与教学项目，不是 `learn-claude-code`、DeepSeek 或其他项目的官方文档。
 
-图示规则见 [STYLE_GUIDE.md](./STYLE_GUIDE.md)，项目协作偏好见 [Agents.md](./Agents.md)。
+部分学习主线受到 [`shareAI-lab/learn-claude-code`](https://github.com/shareAI-lab/learn-claude-code) 启发，但会重新组织概念、解释、插图与代码，让内容更适合初学者阅读。
 
-## 来源
+- 配图规范：[STYLE_GUIDE.md](./STYLE_GUIDE.md)
+- 项目协作规范：[Agents.md](./Agents.md)
+- 参考来源：[SOURCES.md](./SOURCES.md)
 
-- 原项目：[shareAI-lab/learn-claude-code](https://github.com/shareAI-lab/learn-claude-code)
-- 当前起点：[s01 Agent Loop](https://github.com/shareAI-lab/learn-claude-code/tree/main/s01_agent_loop)
-- DeepSeek：[OpenAI SDK 调用示例](https://api-docs.deepseek.com/api_samples/chat_python/)
-- DeepSeek：[Tool Calls 官方说明](https://api-docs.deepseek.com/guides/tool_calls/)
+---
+
+<div align="center">
+
+### 从一个循环开始，慢慢看懂整个 Agent 世界。
+
+如果这个项目对你有帮助，欢迎 ⭐ Star 或一起补充新的章节。
+
+</div>
