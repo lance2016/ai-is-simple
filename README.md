@@ -77,15 +77,15 @@ Planning / Subagents / Memory / MCP ...
 
 ## 学习路线
 
-目前已完成 **3 / 18** 章。
+目前已完成 **5 / 18** 章。
 
 | 状态 | 章节 | 核心概念 | 只记住一句话 |
 | --- | --- | --- | --- |
 | ✅ | [00 · Chat Completion](./chapters/00-chat-completion/) | 一次模型请求 | 模型只知道这一次请求提供给它的上下文 |
 | ✅ | [01 · Agent Loop](./chapters/01-agent-loop/) | Agent 的最小循环 | 模型决定下一步，工具负责执行 |
 | ✅ | [02 · Tool Use](./chapters/02-tool-use/) | 工具调用与分发 | 加工具，不需要重写整个循环 |
-| ⏳ | 03 · Permission | 权限 | 能做，不代表应该直接做 |
-| ⏳ | 04 · Hooks | 扩展点 | 在关键位置留下可插拔接口 |
+| ✅ | [03 · Permission](./chapters/03-permission/) | 权限 | 能做，不代表应该直接做 |
+| ✅ | [04 · Hooks](./chapters/04-hooks/) | 扩展点 | 在关键位置留下可插拔接口 |
 | ⏳ | 05 · Planning | 计划 | 复杂任务先拆，再执行 |
 | ⏳ | 06 · Subagents | 子 Agent | 大任务拆小，并隔离上下文 |
 | ⏳ | 07 · Skill Loading | 技能加载 | 用到什么，再加载什么 |
@@ -192,7 +192,9 @@ ai-is-simple/
 │   ├── learning-roadmap.png
 │   ├── chapter-00-chat-completion.png
 │   ├── chapter-01-agent-loop.png
-│   └── chapter-02-tool-use.png
+│   ├── chapter-02-tool-use.png
+│   ├── chapter-03-permission.png
+│   └── chapter-04-hooks.png
 ├── requirements.txt
 ├── .env.example
 └── chapters/
@@ -202,7 +204,13 @@ ai-is-simple/
     ├── 01-agent-loop/
     │   ├── README.md
     │   └── code.py
-    └── 02-tool-use/
+    ├── 02-tool-use/
+    │   ├── README.md
+    │   └── code.py
+    ├── 03-permission/
+    │   ├── README.md
+    │   └── code.py
+    └── 04-hooks/
         ├── README.md
         └── code.py
 ```
@@ -254,7 +262,7 @@ ai-is-simple/
 
 <div align="center">
 
-### 从一个循环开始，慢慢看懂整个 Agent 世界。
+### 从一次请求开始，慢慢看懂整个 Agent 世界。
 
 如果这个项目对你有帮助，欢迎 ⭐ Star 或一起补充新的章节。
 
