@@ -1,25 +1,6 @@
 # 第 02 章：Tool Use
 
-```mermaid
-flowchart LR
-    M["模型<br/>提出工具调用"] --> D{"按工具名查找"}
-    D -->|list_files| L["list_files()"]
-    D -->|read_file| R["read_file()"]
-    D -->|get_today| T["get_today()"]
-    L --> O["工具结果"]
-    R --> O
-    T --> O
-    O --> M
-
-    classDef model fill:#FCE4EC,stroke:#C2185B,stroke-width:2px,color:#263238
-    classDef dispatch fill:#FFF8E1,stroke:#B8860B,stroke-width:2px,color:#263238
-    classDef handler fill:#E3F2FD,stroke:#1976D2,stroke-width:2px,color:#263238
-    classDef result fill:#E8F5E9,stroke:#388E3C,stroke-width:2px,color:#263238
-    class M model
-    class D dispatch
-    class L,R,T handler
-    class O result
-```
+![Tool Use：工具分发示意图](./assets/tool-dispatch.png)
 
 > **一句话总结：增加工具，不需要重写循环，只需要增加工具定义和处理函数。**
 
@@ -134,4 +115,3 @@ for tool_call in message.tool_calls:
 - [learn-claude-code](https://github.com/shareAI-lab/learn-claude-code)
 - [s02 Tool Use](https://github.com/shareAI-lab/learn-claude-code/tree/main/s02_tool_use)
 - [DeepSeek Tool Calls](https://api-docs.deepseek.com/guides/tool_calls/)
-
