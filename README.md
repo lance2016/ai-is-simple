@@ -66,7 +66,10 @@ python chapters/01-agent-loop/code.py
 | 16 | Workflow Runtime | 固定的编排形状，可以沉淀成流程 |
 | 17 | Goal Loop | 目标决定循环什么时候真正结束 |
 
-目前已完成第 01 章，后续章节会逐步补充。
+目前已完成第 01、02 章，后续章节会逐步补充。
+
+- [第 01 章：Agent Loop](./chapters/01-agent-loop/)
+- [第 02 章：Tool Use](./chapters/02-tool-use/)
 
 ## 项目边界
 
