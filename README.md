@@ -1,6 +1,6 @@
 # AI 如此简单
 
-> 每天一幅图，讲清一个 AI 核心概念。
+> 一句话、一幅图、一小段代码，把一个 AI 概念讲明白。
 
 这是一个面向初学者的 AI 学习笔记项目。
 
@@ -10,14 +10,39 @@
 
 > **看完这张图，我能不能用自己的话解释它？**
 
+## 默认技术栈
+
+为了让示例容易复现，代码默认使用：
+
+- 模型：DeepSeek，默认值为 `deepseek-flash`；
+- SDK：OpenAI Python SDK；
+- API：DeepSeek 的 OpenAI 兼容接口；
+- 配置：通过 `.env` 文件读取 API Key。
+
+如果你的账号使用其他模型，只需要修改 `DEEPSEEK_MODEL`。
+
 ## 每一章怎么读
 
 每章都尽量保持同一种节奏：
 
 1. 先看一幅图，建立整体印象；
-2. 用一段白话解释核心概念；
-3. 用一个生活例子把它落地；
-4. 最后看一点点代码或伪代码，理解它是怎么实现的。
+2. 先用一句话说结论；
+3. 用几个短段落和一个生活例子展开；
+4. 最后看一小段 DeepSeek + OpenAI SDK 代码。
+
+尽量不写大段说教文字。每章只讲一个核心概念。
+
+## 第一次运行
+
+```bash
+cd /Users/lance/Desktop/ai-is-simple
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+cp .env.example .env
+# 编辑 .env，填入 DEEPSEEK_API_KEY
+python chapters/01-agent-loop/code.py
+```
 
 ## 学习路线
 
@@ -51,4 +76,5 @@
 
 - 原项目：[shareAI-lab/learn-claude-code](https://github.com/shareAI-lab/learn-claude-code)
 - 当前起点：[s01 Agent Loop](https://github.com/shareAI-lab/learn-claude-code/tree/main/s01_agent_loop)
-
+- DeepSeek：[OpenAI SDK 调用示例](https://api-docs.deepseek.com/api_samples/chat_python/)
+- DeepSeek：[Tool Calls 官方说明](https://api-docs.deepseek.com/guides/tool_calls/)
