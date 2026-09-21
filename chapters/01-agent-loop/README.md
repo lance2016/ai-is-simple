@@ -1,6 +1,25 @@
 # 第 01 章：Agent Loop
 
-![Agent Loop 手绘草图：用户任务只进入一次，工具结果回到模型](./assets/agent-loop-sketch.svg)
+```mermaid
+flowchart TD
+    U(["用户任务<br/>只输入一次"]) --> M{"模型决定"}
+
+    subgraph LOOP["Agent Loop：模型和工具之间的循环"]
+        direction LR
+        M -->|需要工具| T["工具执行"]
+        T --> R["工具结果"]
+        R -->|把结果送回模型| M
+    end
+
+    M -->|无需工具调用| A(["输出答案<br/>结束"])
+
+    classDef input fill:#FFF8E5,stroke:#B88A2E,stroke-width:2px,color:#2C3945
+    classDef loop fill:#EDF4FB,stroke:#547EA6,stroke-width:2px,color:#2C3945
+    classDef finish fill:#EEF6EF,stroke:#6D9A76,stroke-width:2px,color:#2C3945
+    class U input
+    class M,T,R loop
+    class A finish
+```
 
 > **一句话总结：模型决定下一步，工具负责把这一步做出来。**
 
@@ -96,13 +115,6 @@ while True:
 - **模型**：理解任务，决定下一步做什么；
 - **工具**：执行模型要求的动作；
 - **循环**：把工具结果送回模型。
-
-可以把它记成：
-
-```text
-模型决定 → 工具执行 → 工具结果 → 模型再次决定
-                         ↘ 不需要工具 → 输出答案
-```
 
 ## 模型和 Harness 的分工
 
