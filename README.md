@@ -77,7 +77,7 @@ Planning / Subagents / Memory / MCP ...
 
 ## 学习路线
 
-目前已完成 **7 / 18** 章。
+目前已完成 **11 / 18** 章。
 
 | 状态 | 章节 | 核心概念 | 只记住一句话 |
 | --- | --- | --- | --- |
@@ -88,10 +88,10 @@ Planning / Subagents / Memory / MCP ...
 | ✅ | [04 · Hooks](./chapters/04-hooks/) | 扩展点 | 在关键位置留下可插拔接口 |
 | ✅ | [05 · Planning](./chapters/05-planning/) | 计划 | 复杂任务先拆，再执行 |
 | ✅ | [06 · Subagents](./chapters/06-subagents/) | 子 Agent | 大任务拆小，并隔离上下文 |
-| ⏳ | 07 · Skill Loading | 技能加载 | 用到什么，再加载什么 |
-| ⏳ | 08 · Context Compact | 上下文压缩 | 上下文有限，要主动腾空间 |
-| ⏳ | 09 · Memory | 记忆 | 重要信息跨对话保留下来 |
-| ⏳ | 10 · Tasks | 任务管理 | 把目标变成可追踪的步骤 |
+| ✅ | [07 · Skill Loading](./chapters/07-skill-loading/) | 技能加载 | 用到什么，再加载什么 |
+| ✅ | [08 · Context Compact](./chapters/08-context-compact/) | 上下文压缩 | 上下文有限，要主动腾空间 |
+| ✅ | [09 · Memory](./chapters/09-memory/) | 记忆 | 重要信息跨对话保留下来 |
+| ✅ | [10 · Tasks](./chapters/10-tasks/) | 任务管理 | 把目标变成可追踪的步骤 |
 | ⏳ | 11 · Background Tasks | 后台任务 | 慢任务不应该阻塞 Agent |
 | ⏳ | 12 · Cron | 定时任务 | 让任务在未来自动发生 |
 | ⏳ | 13 · Agent Teams | 多 Agent 协作 | 一个 Agent 忙不过来，就分工 |
@@ -196,7 +196,11 @@ ai-is-simple/
 │   ├── chapter-03-permission.png
 │   ├── chapter-04-hooks.png
 │   ├── chapter-05-planning.png
-│   └── chapter-06-subagents.png
+│   ├── chapter-06-subagents.png
+│   ├── chapter-07-skill-loading.png
+│   ├── chapter-08-context-compact.png
+│   ├── chapter-09-memory.png
+│   └── chapter-10-tasks.png
 ├── requirements.txt
 ├── .env.example
 └── chapters/
@@ -218,7 +222,20 @@ ai-is-simple/
     ├── 05-planning/
     │   ├── README.md
     │   └── code.py
-    └── 06-subagents/
+    ├── 06-subagents/
+    │   ├── README.md
+    │   └── code.py
+    ├── 07-skill-loading/
+    │   ├── README.md
+    │   ├── code.py
+    │   └── skills/
+    ├── 08-context-compact/
+    │   ├── README.md
+    │   └── code.py
+    ├── 09-memory/
+    │   ├── README.md
+    │   └── code.py
+    └── 10-tasks/
         ├── README.md
         └── code.py
 ```

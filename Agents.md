@@ -26,7 +26,7 @@
 - 每一章只保留一张主图，避免两张表达同一概念的图重复出现。
 - 优先使用已经确认过的、简洁、克制、信息层级清楚的教学图。
 - 新章节配图生成时，优先参考已经确认的章节主图保持系列统一；当前系列参考图为 `assets/chapter-01-agent-loop.png`。
-- 当前已确认的章节主图：`assets/chapter-00-chat-completion.png`、`assets/chapter-01-agent-loop.png`、`assets/chapter-02-tool-use.png`、`assets/chapter-03-permission.png`、`assets/chapter-04-hooks.png`、`assets/chapter-05-planning.png`、`assets/chapter-06-subagents.png`。
+- 当前已确认的章节主图：`assets/chapter-00-chat-completion.png`、`assets/chapter-01-agent-loop.png`、`assets/chapter-02-tool-use.png`、`assets/chapter-03-permission.png`、`assets/chapter-04-hooks.png`、`assets/chapter-05-planning.png`、`assets/chapter-06-subagents.png`、`assets/chapter-07-skill-loading.png`、`assets/chapter-08-context-compact.png`、`assets/chapter-09-memory.png`、`assets/chapter-10-tasks.png`。
 - 图片中的文字必须清晰可辨认，不能依赖随机生成的长段文字。
 - 配色保持简洁：少量颜色表达角色或状态，不用复杂渐变和装饰性噪点。
 - 流程图需要明确区分：输入、模型决策、工具执行、工具结果、终止输出。
