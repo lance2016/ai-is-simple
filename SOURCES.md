@@ -6,6 +6,8 @@
 - [s01: Agent Loop](https://github.com/shareAI-lab/learn-claude-code/tree/main/s01_agent_loop)
 - [s03: Permission](https://github.com/shareAI-lab/learn-claude-code/tree/main/s03_permission)
 - [s04: Hooks](https://github.com/shareAI-lab/learn-claude-code/tree/main/s04_hooks)
+- [s05: TodoWrite / Planning](https://github.com/shareAI-lab/learn-claude-code/tree/main/s05_todo_write)
+- [s06: Subagent](https://github.com/shareAI-lab/learn-claude-code/tree/main/s06_subagent)
 - [DeepSeek OpenAI SDK 调用示例](https://api-docs.deepseek.com/api_samples/chat_python/)
 - [DeepSeek Tool Calls 官方说明](https://api-docs.deepseek.com/guides/tool_calls/)
 - [OpenAI Chat Completions API](https://platform.openai.com/docs/api-reference/chat)

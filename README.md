@@ -77,7 +77,7 @@ Planning / Subagents / Memory / MCP ...
 
 ## 学习路线
 
-目前已完成 **5 / 18** 章。
+目前已完成 **7 / 18** 章。
 
 | 状态 | 章节 | 核心概念 | 只记住一句话 |
 | --- | --- | --- | --- |
@@ -86,8 +86,8 @@ Planning / Subagents / Memory / MCP ...
 | ✅ | [02 · Tool Use](./chapters/02-tool-use/) | 工具调用与分发 | 加工具，不需要重写整个循环 |
 | ✅ | [03 · Permission](./chapters/03-permission/) | 权限 | 能做，不代表应该直接做 |
 | ✅ | [04 · Hooks](./chapters/04-hooks/) | 扩展点 | 在关键位置留下可插拔接口 |
-| ⏳ | 05 · Planning | 计划 | 复杂任务先拆，再执行 |
-| ⏳ | 06 · Subagents | 子 Agent | 大任务拆小，并隔离上下文 |
+| ✅ | [05 · Planning](./chapters/05-planning/) | 计划 | 复杂任务先拆，再执行 |
+| ✅ | [06 · Subagents](./chapters/06-subagents/) | 子 Agent | 大任务拆小，并隔离上下文 |
 | ⏳ | 07 · Skill Loading | 技能加载 | 用到什么，再加载什么 |
 | ⏳ | 08 · Context Compact | 上下文压缩 | 上下文有限，要主动腾空间 |
 | ⏳ | 09 · Memory | 记忆 | 重要信息跨对话保留下来 |
@@ -194,7 +194,9 @@ ai-is-simple/
 │   ├── chapter-01-agent-loop.png
 │   ├── chapter-02-tool-use.png
 │   ├── chapter-03-permission.png
-│   └── chapter-04-hooks.png
+│   ├── chapter-04-hooks.png
+│   ├── chapter-05-planning.png
+│   └── chapter-06-subagents.png
 ├── requirements.txt
 ├── .env.example
 └── chapters/
@@ -210,7 +212,13 @@ ai-is-simple/
     ├── 03-permission/
     │   ├── README.md
     │   └── code.py
-    └── 04-hooks/
+    ├── 04-hooks/
+    │   ├── README.md
+    │   └── code.py
+    ├── 05-planning/
+    │   ├── README.md
+    │   └── code.py
+    └── 06-subagents/
         ├── README.md
         └── code.py
 ```
