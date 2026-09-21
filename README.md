@@ -72,7 +72,7 @@ python chapters/01-agent-loop/code.py
 
 这是个人学习笔记，不是原项目的官方文档，也不代表原作者观点。概念、章节顺序和部分术语参考原项目；插画、文字和解释会根据初学者阅读体验重新组织。
 
-图示规则见 [STYLE_GUIDE.md](./STYLE_GUIDE.md)。目前统一使用 Mermaid，保证结构清晰、文字可编辑。
+图示规则见 [STYLE_GUIDE.md](./STYLE_GUIDE.md)，项目协作偏好见 [Agents.md](./Agents.md)。
 
 ## 来源
 
