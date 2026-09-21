@@ -1,6 +1,6 @@
 # 第 01 章：Agent Loop
 
-![Agent Loop：从用户任务开始，工具结果回到模型，直到输出答案](./assets/agent-loop.png)
+![Agent Loop 手绘草图：用户任务只进入一次，工具结果回到模型](./assets/agent-loop-sketch.svg)
 
 > **一句话总结：模型决定下一步，工具负责把这一步做出来。**
 

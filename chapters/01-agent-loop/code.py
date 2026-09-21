@@ -8,8 +8,10 @@ from datetime import datetime
 from dotenv import load_dotenv
 from openai import OpenAI
 
+# 读取项目根目录的 .env，避免把 API Key 直接写进代码。
 load_dotenv()
 
+# 这些配置都可以在 .env 里替换；默认值让示例开箱即用。
 MODEL = os.getenv("DEEPSEEK_MODEL", "deepseek-flash")
 BASE_URL = os.getenv("DEEPSEEK_BASE_URL", "https://api.deepseek.com")
 
@@ -22,6 +24,7 @@ client = OpenAI(
     base_url=BASE_URL,
 )
 
+# 先告诉模型：它有哪些工具可以选择。
 TOOLS = [
     {
         "type": "function",
@@ -43,7 +46,10 @@ def get_today() -> str:
 
 
 def run_tool(tool_call) -> str:
-    """根据模型的选择，执行对应工具并返回结果。"""
+    """根据模型的选择，执行对应工具并返回结果。
+
+    这里是 Harness 的工作：模型只提出请求，Python 真正执行动作。
+    """
     name = tool_call.function.name
     arguments = json.loads(tool_call.function.arguments or "{}")
 
@@ -54,6 +60,7 @@ def run_tool(tool_call) -> str:
 
 
 def agent_loop(user_text: str) -> str:
+    # 用户任务只在循环开始时放入一次。
     messages = [
         {
             "role": "system",
@@ -67,6 +74,7 @@ def agent_loop(user_text: str) -> str:
     ]
 
     while True:
+        # 每一轮都把最新消息发给 DeepSeek，让它决定下一步。
         response = client.chat.completions.create(
             model=MODEL,
             messages=messages,
@@ -74,6 +82,7 @@ def agent_loop(user_text: str) -> str:
             tool_choice="auto",
         )
 
+        # 先保存模型这次的回答，下一轮才能看见完整上下文。
         message = response.choices[0].message
         messages.append(message.model_dump(exclude_none=True))
 
@@ -82,6 +91,7 @@ def agent_loop(user_text: str) -> str:
             return message.content or ""
 
         # 有工具调用：Python 执行工具，再把结果送回模型。
+        # 下一轮不会重新询问用户，而是从工具结果继续判断。
         for tool_call in message.tool_calls:
             result = run_tool(tool_call)
             messages.append(
