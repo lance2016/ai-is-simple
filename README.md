@@ -172,13 +172,17 @@ ai-is-simple/
 ├── Agents.md
 ├── STYLE_GUIDE.md
 ├── SOURCES.md
+├── assets/
+│   ├── readme-hero.png
+│   ├── learning-roadmap.png
+│   ├── chapter-01-agent-loop.png
+│   └── chapter-02-tool-use.png
 ├── requirements.txt
 ├── .env.example
 └── chapters/
     ├── 01-agent-loop/
     │   ├── README.md
-    │   ├── code.py
-    │   └── assets/
+    │   └── code.py
     └── 02-tool-use/
         ├── README.md
         └── code.py

@@ -1,6 +1,6 @@
 # 第 02 章：Tool Use
 
-![Tool Use：工具分发示意图](./assets/tool-dispatch.png)
+![Tool Use：工具分发示意图](../../assets/chapter-02-tool-use.png)
 
 > **一句话总结：增加工具，不需要重写循环，只需要增加工具定义和处理函数。**
 

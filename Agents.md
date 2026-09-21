@@ -22,10 +22,11 @@
 ## 配图偏好
 
 - 每一章的首页主视觉必须使用 ImageGen 工具生成或编辑，不能直接用 Mermaid 作为最终主图；后续生成章节时不要跳过 ImageGen。
+- 所有章节主图统一放在根目录 `assets/`，文件名必须带章节编号和主题，例如 `chapter-02-tool-use.png`，不要在章节目录下再创建图片目录。
 - 每一章只保留一张主图，避免两张表达同一概念的图重复出现。
 - 优先使用已经确认过的、简洁、克制、信息层级清楚的教学图。
-- 新章节配图生成时，优先参考已经确认的章节主图保持系列统一；当前系列参考图为 `chapters/01-agent-loop/assets/agent-loop.png`。
-- 当前第 01 章使用：`chapters/01-agent-loop/assets/agent-loop.png`。
+- 新章节配图生成时，优先参考已经确认的章节主图保持系列统一；当前系列参考图为 `assets/chapter-01-agent-loop.png`。
+- 当前已确认的章节主图：`assets/chapter-01-agent-loop.png`、`assets/chapter-02-tool-use.png`。
 - 图片中的文字必须清晰可辨认，不能依赖随机生成的长段文字。
 - 配色保持简洁：少量颜色表达角色或状态，不用复杂渐变和装饰性噪点。
 - 流程图需要明确区分：输入、模型决策、工具执行、工具结果、终止输出。

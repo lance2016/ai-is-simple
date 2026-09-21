@@ -1,6 +1,6 @@
 # 第 01 章：Agent Loop
 
-![Agent Loop：模型决定、工具执行、工具结果、模型再次决定](./assets/agent-loop.png)
+![Agent Loop：模型决定、工具执行、工具结果、模型再次决定](../../assets/chapter-01-agent-loop.png)
 
 > **一句话总结：模型决定下一步，工具负责把这一步做出来。**
 
