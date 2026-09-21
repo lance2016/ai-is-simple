@@ -72,6 +72,8 @@ python chapters/01-agent-loop/code.py
 
 这是个人学习笔记，不是原项目的官方文档，也不代表原作者观点。概念、章节顺序和部分术语参考原项目；插画、文字和解释会根据初学者阅读体验重新组织。
 
+视觉方向和绘图规则见 [STYLE_GUIDE.md](./STYLE_GUIDE.md)。
+
 ## 来源
 
 - 原项目：[shareAI-lab/learn-claude-code](https://github.com/shareAI-lab/learn-claude-code)

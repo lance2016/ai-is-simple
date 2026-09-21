@@ -1,77 +1,80 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="900" viewBox="0 0 1600 900" role="img" aria-labelledby="title desc">
-  <title id="title">Agent Loop 手绘草图</title>
-  <desc id="desc">用户任务只输入一次，模型决定是否调用工具，工具结果返回模型；不需要工具时输出答案并结束。</desc>
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="960" viewBox="0 0 1600 960" role="img" aria-labelledby="title desc">
+  <title id="title">Agent Loop 手绘风教学草图</title>
+  <desc id="desc">用户任务只输入一次，模型决定是否调用工具，工具结果回到模型；不需要工具时输出答案并结束。</desc>
 
   <defs>
-    <marker id="arrow-blue" markerWidth="14" markerHeight="14" refX="11" refY="7" orient="auto">
-      <path d="M 0 0 L 14 7 L 0 14" fill="none" stroke="#253449" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+    <marker id="arrow-ink" markerWidth="14" markerHeight="14" refX="12" refY="7" markerUnits="userSpaceOnUse" orient="auto">
+      <path d="M1 1 L13 7 L1 13" fill="none" stroke="#2c3945" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
     </marker>
-    <marker id="arrow-green" markerWidth="14" markerHeight="14" refX="11" refY="7" orient="auto">
-      <path d="M 0 0 L 14 7 L 0 14" fill="none" stroke="#4d806c" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+    <marker id="arrow-blue" markerWidth="14" markerHeight="14" refX="12" refY="7" markerUnits="userSpaceOnUse" orient="auto">
+      <path d="M1 1 L13 7 L1 13" fill="none" stroke="#547ea6" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
     </marker>
-    <filter id="paper" x="-5%" y="-5%" width="110%" height="110%">
-      <feTurbulence type="fractalNoise" baseFrequency="0.025" numOctaves="2" seed="9" result="noise"/>
-      <feColorMatrix in="noise" type="saturate" values="0" result="grayNoise"/>
-      <feComponentTransfer in="grayNoise" result="softNoise">
-        <feFuncA type="table" tableValues="0 0.04"/>
-      </feComponentTransfer>
-      <feBlend in="SourceGraphic" in2="softNoise" mode="multiply"/>
-    </filter>
+    <marker id="arrow-green" markerWidth="14" markerHeight="14" refX="12" refY="7" markerUnits="userSpaceOnUse" orient="auto">
+      <path d="M1 1 L13 7 L1 13" fill="none" stroke="#6d9a76" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+    </marker>
   </defs>
 
-  <rect width="1600" height="900" fill="#fcfbf8"/>
-  <g filter="url(#paper)">
-    <path d="M92 132 C350 125 615 139 880 130 S1330 130 1500 134" fill="none" stroke="#d7dce3" stroke-width="3" stroke-linecap="round"/>
-    <text x="100" y="92" fill="#253449" font-family="PingFang SC, Noto Sans CJK SC, sans-serif" font-size="42" font-weight="600">可以把它记成：</text>
+  <rect width="1600" height="960" fill="#fefcf6"/>
 
-    <!-- 第一次输入：只从用户进入一次 -->
-    <g transform="rotate(-1 205 310)">
-      <rect x="100" y="245" width="230" height="130" rx="18" fill="#fffdf9" stroke="#253449" stroke-width="4"/>
-      <path d="M110 254 C160 240 266 249 320 256" fill="none" stroke="#cdd5df" stroke-width="2"/>
-      <text x="215" y="305" text-anchor="middle" fill="#253449" font-family="PingFang SC, Noto Sans CJK SC, sans-serif" font-size="34" font-weight="600">用户任务</text>
-      <text x="215" y="348" text-anchor="middle" fill="#697586" font-family="PingFang SC, Noto Sans CJK SC, sans-serif" font-size="24">只输入一次</text>
-    </g>
+  <!-- 标题：像手写在纸上的一句提示 -->
+  <text x="112" y="105" fill="#2c3945" font-family="Chalkboard SE, Hiragino Maru Gothic ProN, STHeiti, sans-serif" font-size="48" font-weight="600">可以把它记成：</text>
+  <path d="M112 132 C330 126 520 139 730 131" fill="none" stroke="#eacb82" stroke-width="13" stroke-linecap="round"/>
+  <text x="112" y="195" fill="#2c3945" font-family="Chalkboard SE, Hiragino Maru Gothic ProN, STHeiti, sans-serif" font-size="37" font-weight="600">模型决定  →  工具执行  →  工具结果  →  模型再决定</text>
 
-    <!-- 模型决定 -->
-    <g transform="rotate(1 545 310)">
-      <rect x="420" y="245" width="260" height="130" rx="18" fill="#fffdf9" stroke="#253449" stroke-width="4"/>
-      <text x="550" y="322" text-anchor="middle" fill="#253449" font-family="PingFang SC, Noto Sans CJK SC, sans-serif" font-size="36" font-weight="700">模型决定</text>
-    </g>
-
-    <!-- 工具执行 -->
-    <g transform="rotate(-1 900 310)">
-      <rect x="770" y="245" width="260" height="130" rx="18" fill="#fffdf9" stroke="#253449" stroke-width="4"/>
-      <text x="900" y="322" text-anchor="middle" fill="#253449" font-family="PingFang SC, Noto Sans CJK SC, sans-serif" font-size="36" font-weight="700">工具执行</text>
-    </g>
-
-    <!-- 工具结果 -->
-    <g transform="rotate(1 1250 310)">
-      <rect x="1120" y="245" width="260" height="130" rx="18" fill="#fffdf9" stroke="#253449" stroke-width="4"/>
-      <text x="1250" y="322" text-anchor="middle" fill="#253449" font-family="PingFang SC, Noto Sans CJK SC, sans-serif" font-size="36" font-weight="700">工具结果</text>
-    </g>
-
-    <!-- 主路径：用户只进入一次，之后只在模型和工具之间循环 -->
-    <path d="M330 310 C360 310 382 310 414 310" fill="none" stroke="#253449" stroke-width="7" stroke-linecap="round" marker-end="url(#arrow-blue)"/>
-    <path d="M680 310 C715 310 735 310 764 310" fill="none" stroke="#253449" stroke-width="7" stroke-linecap="round" marker-end="url(#arrow-blue)"/>
-    <path d="M1030 310 C1060 310 1085 310 1112 310" fill="none" stroke="#253449" stroke-width="7" stroke-linecap="round" marker-end="url(#arrow-blue)"/>
-
-    <!-- 工具结果回到模型，而不是回到用户 -->
-    <path d="M1250 380 C1250 520 1120 570 900 570 C700 570 555 520 555 390" fill="none" stroke="#253449" stroke-width="7" stroke-linecap="round" marker-end="url(#arrow-blue)"/>
-    <text x="900" y="535" text-anchor="middle" fill="#697586" font-family="PingFang SC, Noto Sans CJK SC, sans-serif" font-size="28">模型根据工具结果继续决定</text>
-
-    <!-- 终止分支：不再调用工具 -->
-    <path d="M520 380 C500 470 390 555 365 660" fill="none" stroke="#4d806c" stroke-width="7" stroke-linecap="round" marker-end="url(#arrow-green)"/>
-    <text x="315" y="525" text-anchor="middle" fill="#4d806c" font-family="PingFang SC, Noto Sans CJK SC, sans-serif" font-size="28" transform="rotate(-25 315 525)">无需工具调用</text>
-
-    <g transform="rotate(-1 500 745)">
-      <rect x="210" y="655" width="360" height="125" rx="20" fill="#eef6f0" stroke="#4d806c" stroke-width="4"/>
-      <circle cx="275" cy="718" r="28" fill="#4d806c"/>
-      <path d="M260 718 L271 730 L293 704" fill="none" stroke="#fffdf9" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"/>
-      <text x="420" y="710" text-anchor="middle" fill="#253449" font-family="PingFang SC, Noto Sans CJK SC, sans-serif" font-size="34" font-weight="700">输出答案</text>
-      <text x="420" y="750" text-anchor="middle" fill="#4d806c" font-family="PingFang SC, Noto Sans CJK SC, sans-serif" font-size="27">结束</text>
-    </g>
-
-    <text x="800" y="755" text-anchor="middle" fill="#697586" font-family="PingFang SC, Noto Sans CJK SC, sans-serif" font-size="28">循环发生在：模型决定 ↔ 工具执行 ↔ 工具结果</text>
-    <path d="M100 835 C420 827 720 842 1030 833 S1370 834 1500 839" fill="none" stroke="#d7dce3" stroke-width="3" stroke-linecap="round"/>
+  <!-- 节点 1：用户，只输入一次 -->
+  <g>
+    <path d="M120 306 C127 287 145 282 170 285 C234 280 311 287 347 300 C361 318 358 380 347 402 C298 414 192 413 133 399 C118 382 113 334 120 306 Z" fill="#fffefa" stroke="#2c3945" stroke-width="5" stroke-linejoin="round"/>
+    <circle cx="171" cy="342" r="31" fill="#eacb82" stroke="#2c3945" stroke-width="4"/>
+    <circle cx="160" cy="337" r="4" fill="#2c3945"/>
+    <circle cx="182" cy="337" r="4" fill="#2c3945"/>
+    <path d="M160 354 C168 362 178 362 186 354" fill="none" stroke="#2c3945" stroke-width="4" stroke-linecap="round"/>
+    <text x="220" y="349" fill="#2c3945" font-family="Chalkboard SE, Hiragino Maru Gothic ProN, STHeiti, sans-serif" font-size="36" font-weight="600">用户任务</text>
+    <text x="220" y="384" fill="#547ea6" font-family="Chalkboard SE, Hiragino Maru Gothic ProN, STHeiti, sans-serif" font-size="25">只输入一次</text>
   </g>
+
+  <!-- 节点 2：模型决定 -->
+  <g>
+    <path d="M466 299 C508 286 650 286 704 301 C715 326 714 378 703 402 C645 414 514 412 468 400 C456 372 455 326 466 299 Z" fill="#fffefa" stroke="#2c3945" stroke-width="5" stroke-linejoin="round"/>
+    <path d="M516 342 C530 317 554 317 567 340 C580 315 608 318 615 343 C638 326 665 337 665 360 C660 382 628 386 607 381 L551 382 C526 382 506 364 516 342 Z" fill="none" stroke="#547ea6" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+    <text x="626" y="358" text-anchor="middle" fill="#2c3945" font-family="Chalkboard SE, Hiragino Maru Gothic ProN, STHeiti, sans-serif" font-size="36" font-weight="600">模型决定</text>
+  </g>
+
+  <!-- 节点 3：工具执行 -->
+  <g>
+    <path d="M826 304 C874 287 1002 287 1064 305 C1074 333 1072 377 1060 401 C1008 414 880 413 831 399 C819 372 817 329 826 304 Z" fill="#fffefa" stroke="#2c3945" stroke-width="5" stroke-linejoin="round"/>
+    <rect x="867" y="327" width="70" height="48" rx="7" fill="#eacb82" stroke="#2c3945" stroke-width="4"/>
+    <path d="M881 348 L897 361 L881 374 M906 374 L925 374" fill="none" stroke="#2c3945" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+    <text x="1004" y="358" text-anchor="middle" fill="#2c3945" font-family="Chalkboard SE, Hiragino Maru Gothic ProN, STHeiti, sans-serif" font-size="36" font-weight="600">工具执行</text>
+  </g>
+
+  <!-- 节点 4：工具结果 -->
+  <g>
+    <path d="M1180 304 C1226 288 1366 288 1428 305 C1438 332 1436 378 1425 401 C1369 414 1236 412 1184 399 C1173 372 1171 330 1180 304 Z" fill="#fffefa" stroke="#2c3945" stroke-width="5" stroke-linejoin="round"/>
+    <path d="M1234 328 L1302 328 L1302 379 L1234 379 Z" fill="#f4eee2" stroke="#2c3945" stroke-width="4"/>
+    <path d="M1248 344 L1289 344 M1248 356 L1280 356 M1248 368 L1270 368" fill="none" stroke="#547ea6" stroke-width="4" stroke-linecap="round"/>
+    <text x="1363" y="358" text-anchor="middle" fill="#2c3945" font-family="Chalkboard SE, Hiragino Maru Gothic ProN, STHeiti, sans-serif" font-size="36" font-weight="600">工具结果</text>
+  </g>
+
+  <!-- 第一次路径：用户 -> 模型 -> 工具 -> 结果 -->
+  <path d="M360 350 C395 348 423 348 454 350" fill="none" stroke="#2c3945" stroke-width="7" stroke-linecap="round" marker-end="url(#arrow-ink)"/>
+  <path d="M716 350 C752 348 784 348 814 350" fill="none" stroke="#2c3945" stroke-width="7" stroke-linecap="round" marker-end="url(#arrow-ink)"/>
+  <path d="M1076 350 C1112 348 1142 348 1168 350" fill="none" stroke="#2c3945" stroke-width="7" stroke-linecap="round" marker-end="url(#arrow-ink)"/>
+
+  <!-- 循环路径：结果回到模型 -->
+  <path d="M1305 425 C1302 556 1124 618 890 618 C690 618 577 550 577 428" fill="none" stroke="#547ea6" stroke-width="8" stroke-linecap="round" marker-end="url(#arrow-blue)"/>
+  <text x="930" y="588" text-anchor="middle" fill="#547ea6" font-family="Chalkboard SE, Hiragino Maru Gothic ProN, STHeiti, sans-serif" font-size="29" font-weight="600">工具结果回到模型</text>
+
+  <!-- 终止分支：模型决定不再调用工具 -->
+  <path d="M540 425 C523 498 438 565 410 684" fill="none" stroke="#6d9a76" stroke-width="8" stroke-linecap="round" marker-end="url(#arrow-green)"/>
+  <text x="365" y="556" fill="#6d9a76" font-family="Chalkboard SE, Hiragino Maru Gothic ProN, STHeiti, sans-serif" font-size="29" font-weight="600" transform="rotate(-27 365 556)">无需工具调用</text>
+
+  <g>
+    <path d="M254 699 C302 686 524 690 575 704 C588 730 585 791 571 814 C507 826 320 823 266 810 C251 785 246 727 254 699 Z" fill="#eef6ef" stroke="#6d9a76" stroke-width="5" stroke-linejoin="round"/>
+    <circle cx="316" cy="755" r="28" fill="#6d9a76"/>
+    <path d="M301 755 L312 767 L333 742" fill="none" stroke="#fffefa" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"/>
+    <text x="455" y="755" text-anchor="middle" fill="#2c3945" font-family="Chalkboard SE, Hiragino Maru Gothic ProN, STHeiti, sans-serif" font-size="37" font-weight="600">输出答案 / 结束</text>
+  </g>
+
+  <path d="M116 876 C420 868 752 885 1060 875 S1370 872 1485 879" fill="none" stroke="#d7d0c2" stroke-width="4" stroke-linecap="round"/>
+  <text x="800" y="860" text-anchor="middle" fill="#697586" font-family="Chalkboard SE, Hiragino Maru Gothic ProN, STHeiti, sans-serif" font-size="24">手绘不是装饰：只画清楚信息怎么流动</text>
 </svg>
