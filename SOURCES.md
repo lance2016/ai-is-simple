@@ -6,6 +6,7 @@
 - [s01: Agent Loop](https://github.com/shareAI-lab/learn-claude-code/tree/main/s01_agent_loop)
 - [DeepSeek OpenAI SDK 调用示例](https://api-docs.deepseek.com/api_samples/chat_python/)
 - [DeepSeek Tool Calls 官方说明](https://api-docs.deepseek.com/guides/tool_calls/)
+- [OpenAI Chat Completions API](https://platform.openai.com/docs/api-reference/chat)
 
 原项目采用 MIT License。这里的章节结构、概念顺序和部分术语参考原项目；本项目的中文解释、示例和插画为重新整理内容。
 

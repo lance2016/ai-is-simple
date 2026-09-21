@@ -7,7 +7,7 @@
 **一张图 + 一句话 + 一小段代码，把一个 AI Agent 概念真正讲明白。**
 
 面向刚开始学习 **AI / LLM / Agent** 的开发者。  
-不堆术语，不先上框架，从最小 Agent Loop 开始，一层一层搭出完整 Agent。
+不堆术语，不先上框架，从一次最普通的 LLM 请求开始，再一步一步搭出完整 Agent。
 
 </div>
 
@@ -28,15 +28,29 @@
 3. **生活化例子**：把抽象概念落地；
 4. **一小段代码**：真正跑起来。
 
-最终你会从一个最小循环，逐渐理解：
+最终你会从一次普通 Chat Completion 和一个最小循环开始，逐渐理解：
 
-**Tool → Permission → Planning → Subagents → Skills → Context → Memory → Tasks → MCP → Agent Teams → Harness → Workflow**
+**Chat Completion → Agent Loop → Tool Use → Permission → Planning → Subagents → Skills → Context → Memory → Tasks → MCP → Agent Teams → Harness → Workflow**
 
 ---
 
 ## 一张图看懂这门课
 
 <img src="./assets/learning-roadmap.png" alt="AI Agent 学习路线" width="100%" />
+
+学习主线可以先记成：
+
+```text
+Chat Completion
+      ↓
+Agent Loop
+      ↓
+Tool Use
+      ↓
+Permission
+      ↓
+Planning / Subagents / Memory / MCP ...
+```
 
 可以把一个成熟 Agent 想成不断升级的小助手：
 
@@ -63,10 +77,11 @@
 
 ## 学习路线
 
-目前已完成 **2 / 17** 章。
+目前已完成 **3 / 18** 章。
 
 | 状态 | 章节 | 核心概念 | 只记住一句话 |
 | --- | --- | --- | --- |
+| ✅ | [00 · Chat Completion](./chapters/00-chat-completion/) | 一次模型请求 | 模型只知道这一次请求提供给它的上下文 |
 | ✅ | [01 · Agent Loop](./chapters/01-agent-loop/) | Agent 的最小循环 | 模型决定下一步，工具负责执行 |
 | ✅ | [02 · Tool Use](./chapters/02-tool-use/) | 工具调用与分发 | 加工具，不需要重写整个循环 |
 | ⏳ | 03 · Permission | 权限 | 能做，不代表应该直接做 |
@@ -127,13 +142,13 @@ DEEPSEEK_BASE_URL=https://api.deepseek.com
 DEEPSEEK_MODEL=deepseek-flash
 ```
 
-### 4. 运行第一章
+### 4. 运行第 00 章
 
 ```bash
-python chapters/01-agent-loop/code.py
+python chapters/00-chat-completion/code.py
 ```
 
-从这里开始，你已经拥有一个最小可运行 Agent。
+先从一次最普通的模型请求开始，再继续阅读第 01 章，搭出最小可运行 Agent。
 
 ---
 
@@ -175,11 +190,15 @@ ai-is-simple/
 ├── assets/
 │   ├── readme-hero.png
 │   ├── learning-roadmap.png
+│   ├── chapter-00-chat-completion.png
 │   ├── chapter-01-agent-loop.png
 │   └── chapter-02-tool-use.png
 ├── requirements.txt
 ├── .env.example
 └── chapters/
+    ├── 00-chat-completion/
+    │   ├── README.md
+    │   └── code.py
     ├── 01-agent-loop/
     │   ├── README.md
     │   └── code.py
