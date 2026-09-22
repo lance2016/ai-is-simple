@@ -1,24 +1,18 @@
 # 实战篇 01：自己做一个 Coding Agent
 
-![实战篇：自己做一个 Coding Agent](../../assets/lab-01-mini-coding-agent.png)
-
 > **一句话总结：Coding Agent 不神秘，就是“模型循环 + 一组工具 + 一个安全的工作区”。**
 
 理论篇已经把 Agent 的零件拆开了。现在把它们重新装起来，做一个可以读取项目、搜索代码、修改文件并运行检查的简易 Coding Agent。
 
 ## 先看图
 
-```text
-用户任务
-   ↓
-DeepSeek + Agent Loop
-   ├── read / write / edit
-   └── bash：列目录、搜索、测试
-   ↓
-权限确认 + 会话记录
-   ↓
-工具结果回到循环
-```
+![Mini Coding Agent 的工作结构](../../assets/lab-01-mini-coding-agent.png)
+
+看图时只抓住三件事：
+
+- 用户先提出任务；
+- DeepSeek 决定下一步，调用 `read / write / edit / bash`；
+- 工具结果回到循环，权限确认和会话记录由程序负责。
 
 这就是 Pi 这类 Coding Agent 的核心思想：模型提出下一步，Harness 负责把下一步安全地执行出来。工具不必越拆越多，很多动作都可以通过一个受控的 `bash` 完成。Pi 的完整实现使用 TypeScript/Node.js；本实战为了让前面 Python 教程可以直接延续，先用 Python 实现同一套最小结构。
 
