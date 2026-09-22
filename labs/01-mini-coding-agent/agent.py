@@ -16,6 +16,13 @@ from pathlib import Path
 from dotenv import load_dotenv
 from openai import OpenAI
 
+# Unix 下 input() 不一定会自动启用行编辑；导入 readline 后，方向键、退格和历史记录才会正常工作。
+# Windows 没有这个标准库模块时，保留普通 input() 作为降级方案。
+try:
+    import readline  # noqa: F401
+except ImportError:
+    readline = None
+
 load_dotenv()
 
 MODEL = os.getenv("DEEPSEEK_MODEL", "deepseek-flash")
