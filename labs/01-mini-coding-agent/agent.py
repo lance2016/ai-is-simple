@@ -129,11 +129,15 @@ DSML_PARAMETER_RE = re.compile(
 
 def parse_dsml_tool_calls(content: str) -> list[dict]:
     """把兼容层返回的 DSML 文本转换成标准 tool_calls 结构。"""
-    if "dsml" not in content.casefold() or "invoke" not in content.casefold():
+    # 不同兼容层可能输出全角竖线（｜｜），或者在 XML 结束标签前多输出一个反斜杠。
+    # 先做归一化，再使用同一套正则解析，避免把这些显示差异扩散到主循环里。
+    normalized = content.replace("｜", "|")
+    normalized = re.sub(r"\\(?=\s*<\s*/?\s*\|)", "", normalized)
+    if "dsml" not in normalized.casefold() or "invoke" not in normalized.casefold():
         return []
 
     calls = []
-    for index, invoke in enumerate(DSML_INVOKE_RE.finditer(content), start=1):
+    for index, invoke in enumerate(DSML_INVOKE_RE.finditer(normalized), start=1):
         arguments = {
             parameter.group("name"): html.unescape(parameter.group("value")).strip()
             for parameter in DSML_PARAMETER_RE.finditer(invoke.group("body"))
