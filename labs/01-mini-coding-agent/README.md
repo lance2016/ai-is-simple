@@ -72,6 +72,39 @@ DEEPSEEK_MODEL=deepseek-flash
 
 如果你把模型写成 `v4.1-flash` 或 `deepseek-v4.1-flash`，程序也会自动兼容映射到官方 API 名称 `deepseek-flash`。
 
+## 为什么会看到 DSML？
+
+正常的 Function Calling 返回结构应该是：
+
+```text
+assistant.tool_calls
+  └── function.name = bash
+      function.arguments = {"command": "ls ..."}
+```
+
+本例发出的请求也是标准的 OpenAI 兼容写法：传入 `tools=TOOLS`，并设置 `tool_choice="auto"`。有些模型网关或兼容层没有把模型生成的内部 DSML 标记转换成 `message.tool_calls`，而是把它放进 `message.content`，于是终端就会直接显示 `<｜｜DSML｜｜ ...>`。
+
+这不是用户应该看到的最终协议。代码保留了兼容解析，网页界面则统一把它显示成 `FUNCTION CALL` 卡片；真正执行前仍然要经过 `SafeTools` 和权限确认。
+
+## 用网页界面运行
+
+如果希望看清模型请求了什么工具、工具返回了什么，以及哪一步需要授权，可以启动本地界面：
+
+```bash
+python labs/01-mini-coding-agent/web_app.py
+```
+
+然后打开 <http://127.0.0.1:8765>。
+
+界面会把一次任务拆成几种事件：
+
+- `FUNCTION CALL`：模型提出的标准工具调用和参数；
+- `工具返回`：程序执行后的结果；
+- `AUTHORIZATION GATE`：写入、编辑或需要确认的命令，必须点击“允许执行”才会继续；
+- `Agent`：模型根据工具结果生成的自然语言回答。
+
+网页只是观察和确认入口，安全边界仍由 `SafeTools` 执行。关闭网页或拒绝权限不会让模型绕过程序直接修改文件。
+
 ## 代码怎么对应理论篇？
 
 | 理论篇 | 实战代码 |
@@ -84,6 +117,7 @@ DEEPSEEK_MODEL=deepseek-flash
 | Context | `self.messages` |
 | Memory / Session | `SessionStore` 的 JSONL 文件 |
 | Harness | `CodingAgent + SafeTools + SessionStore` |
+| 本地界面 | `web_app.py + web/`，展示事件并接收权限决定 |
 
 最值得注意的是：模型并没有直接读文件，也没有直接执行命令。模型只能提出 Tool Call，真正的操作必须经过 `SafeTools`。`bash` 是能力出口，但不是权限出口；权限仍然由程序决定。
 

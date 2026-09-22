@@ -11,6 +11,7 @@ import re
 import shlex
 import subprocess
 import sys
+from collections.abc import Callable
 from datetime import datetime
 from pathlib import Path
 
@@ -46,6 +47,9 @@ if not API_KEY:
     raise SystemExit("请先在 .env 中填写 DEEPSEEK_API_KEY。")
 
 client = OpenAI(api_key=API_KEY, base_url=BASE_URL)
+
+ConfirmCallback = Callable[[str], bool]
+EventCallback = Callable[[dict], None]
 
 
 def tool_schema(name: str, description: str, properties: dict, required=None) -> dict:
@@ -214,8 +218,10 @@ class SafeTools:
         ".ssh/",
     )
 
-    def __init__(self, workspace: Path):
+    def __init__(self, workspace: Path, confirm_callback: ConfirmCallback | None = None):
         self.workspace = workspace.resolve()
+        # 终端版不传回调，继续使用 input()；网页版本传入回调，把确认交给页面按钮。
+        self.confirm_callback = confirm_callback
 
     def _target(self, user_path: str) -> Path | None:
         # 工具参数中的路径必须是相对路径，并且解析后仍在工作区内。
@@ -233,6 +239,8 @@ class SafeTools:
 
     def _confirm(self, action: str) -> bool:
         """非交互环境默认拒绝写入和执行，避免 Agent 悄悄修改用户文件。"""
+        if self.confirm_callback:
+            return self.confirm_callback(action)
         if not sys.stdin.isatty():
             return False
         # 只把“是否执行”的决定交给用户，不把安全判断交给模型自己承诺。
@@ -376,10 +384,17 @@ class CodingAgent:
         "run", "test", "check", "fix", "implement", "refactor", "git", "pytest", "npm", "python",
     )
 
-    def __init__(self, workspace: Path, session: SessionStore):
+    def __init__(
+        self,
+        workspace: Path,
+        session: SessionStore,
+        confirm_callback: ConfirmCallback | None = None,
+        event_callback: EventCallback | None = None,
+    ):
         self.workspace = workspace
-        self.tools = SafeTools(workspace)
+        self.tools = SafeTools(workspace, confirm_callback=confirm_callback)
         self.session = session
+        self.event_callback = event_callback
         self.messages = session.load()
         # 没有历史消息时，先放入 system 消息，给模型说明角色、边界和工具用法。
         if not self.messages or self.messages[0].get("role") != "system":
@@ -418,12 +433,18 @@ class CodingAgent:
         self.messages.append(message)
         self.session.append(message)
 
+    def emit(self, event: dict) -> None:
+        """把内部过程通知给界面；没有界面回调时，终端版完全不受影响。"""
+        if self.event_callback:
+            self.event_callback(event)
+
     def reset(self) -> None:
         # /clear 只清空当前上下文，不删除磁盘上的历史，方便回看学习。
         self.messages = [{"role": "system", "content": self.system_prompt()}]
 
     def run(self, request: str) -> str:
         self.save({"role": "user", "content": request})
+        self.emit({"type": "user_message", "content": request})
         # 闲聊时不把工具定义发给模型，避免模型为了“做点什么”而误调用 bash。
         if not self.needs_tools(request):
             response = client.chat.completions.create(
@@ -432,6 +453,7 @@ class CodingAgent:
             )
             message = response.choices[0].message
             self.save(message.model_dump(exclude_none=True))
+            self.emit({"type": "assistant_message", "content": message.content or ""})
             return message.content or ""
 
         # Agent Loop 的核心：模型决定下一步 -> 程序执行工具 -> 结果回到模型。
@@ -468,6 +490,7 @@ class CodingAgent:
             self.save(assistant)
             # 没有 tool_calls 代表模型认为信息已经足够，可以直接回答并结束本轮任务。
             if not tool_calls:
+                self.emit({"type": "assistant_message", "content": message.content or ""})
                 return message.content or ""
             for tool_call in tool_calls:
                 try:
@@ -475,12 +498,27 @@ class CodingAgent:
                     # 让模型有机会自行修正，而不是让整个 Agent 直接崩溃。
                     arguments = json.loads(tool_call["function"]["arguments"] or "{}")
                     tool_name = tool_call["function"]["name"]
+                    self.emit(
+                        {
+                            "type": "tool_call",
+                            "id": tool_call["id"],
+                            "name": tool_name,
+                            "arguments": arguments,
+                        }
+                    )
                     print(f"[tool] {tool_name}({json.dumps(arguments, ensure_ascii=False)})")
                     result = self.tools.dispatch(tool_name, arguments)
                 except json.JSONDecodeError as exc:
                     result = f"Error: 工具参数不是有效 JSON：{exc}"
                 tool_message = {"role": "tool", "tool_call_id": tool_call["id"], "content": result}
                 self.save(tool_message)
+                self.emit(
+                    {
+                        "type": "tool_result",
+                        "id": tool_call["id"],
+                        "content": result,
+                    }
+                )
                 print(f"[result] {result[:300]}")
         return f"达到 {MAX_TURNS} 轮上限，已停止自动执行；请检查当前会话后再继续。"
 

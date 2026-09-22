@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Agent Workbench</title>
+    <link rel="stylesheet" href="/app.css" />
+  </head>
+  <body>
+    <div class="page-shell">
+      <header class="topbar">
+        <a class="brand" href="/" aria-label="Agent Workbench 首页">
+          <span class="brand-mark" aria-hidden="true"><i></i><i></i><i></i></span>
+          <span>
+            <span class="eyebrow">LOCAL HARNESS / 01</span>
+            <strong>Agent Workbench</strong>
+          </span>
+        </a>
+        <div class="topbar-meta">
+          <span class="live-state"><span id="stateDot"></span><span id="stateText">就绪</span></span>
+          <span class="topbar-divider"></span>
+          <span id="workspaceShort" class="workspace-short">本地工作区</span>
+        </div>
+      </header>
+
+      <main class="layout">
+        <section class="conversation-panel panel">
+          <div class="panel-header">
+            <div>
+              <span class="eyebrow">CONVERSATION / TOOL TRACE</span>
+              <h1>让每一步都看得见</h1>
+            </div>
+            <button id="resetButton" class="quiet-button" type="button">清空上下文</button>
+          </div>
+
+          <div id="timeline" class="timeline" aria-live="polite">
+            <div id="emptyState" class="empty-state">
+              <div class="empty-glyph">↗</div>
+              <h2>从一个工作区问题开始</h2>
+              <p>例如：列出桌面有什么，或检查项目里有哪些 README。</p>
+              <div class="empty-note"><span>MODEL</span> DeepSeek-V4.1-Flash <span class="slash">/</span> <span>TOOLS</span> 4</div>
+            </div>
+          </div>
+
+          <form id="promptForm" class="composer">
+            <label class="composer-label" for="promptInput">ASK THE WORKSPACE</label>
+            <textarea id="promptInput" rows="3" placeholder="告诉 Agent 你想了解或处理什么……" autocomplete="off"></textarea>
+            <div class="composer-footer">
+              <span class="keyboard-hint">Enter 发送&nbsp;&nbsp;·&nbsp;&nbsp;Shift + Enter 换行</span>
+              <button id="sendButton" class="send-button" type="submit">运行任务 <span aria-hidden="true">↗</span></button>
+            </div>
+          </form>
+        </section>
+
+        <aside class="inspector">
+          <section class="inspector-block intro-block">
+            <span class="eyebrow">THE LOOP, EXPOSED</span>
+            <p class="thesis">模型提出下一步，Harness 负责把它安全地做出来。</p>
+          </section>
+
+          <section class="inspector-block flow-block">
+            <div class="block-heading"><span>执行路径</span><span class="tiny-status">LIVE</span></div>
+            <div class="flow-map" aria-label="Agent Loop 执行路径">
+              <div class="flow-node active"><b>01</b><span>你的任务</span></div>
+              <span class="flow-arrow">→</span>
+              <div class="flow-node"><b>02</b><span>模型决定</span></div>
+              <span class="flow-arrow">→</span>
+              <div class="flow-node"><b>03</b><span>工具执行</span></div>
+              <span class="flow-arrow">→</span>
+              <div class="flow-node"><b>04</b><span>结果回来</span></div>
+            </div>
+          </section>
+
+          <section class="inspector-block workspace-block">
+            <div class="block-heading"><span>当前工作区</span><span class="folder-chip">DIR</span></div>
+            <code id="workspacePath">等待连接……</code>
+            <div class="rule-list">
+              <div><span class="rule-dot safe"></span>只读检查自动执行</div>
+              <div><span class="rule-dot ask"></span>写入与执行需要确认</div>
+              <div><span class="rule-dot stop"></span>敏感目录自动拦截</div>
+            </div>
+          </section>
+
+          <section class="inspector-block tools-block">
+            <div class="block-heading"><span>可用工具</span><span class="tool-count">4</span></div>
+            <div class="tool-list">
+              <div><code>read</code><span>读取文本</span></div>
+              <div><code>write</code><span>创建文件</span></div>
+              <div><code>edit</code><span>精确修改</span></div>
+              <div><code>bash</code><span>列出、搜索、检查</span></div>
+            </div>
+          </section>
+
+          <p class="footer-note">不是把黑盒变漂亮，而是把边界摆到你面前。</p>
+        </aside>
+      </main>
+    </div>
+    <script src="/app.js"></script>
+  </body>
+</html>
