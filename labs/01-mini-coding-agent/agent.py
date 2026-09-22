@@ -25,6 +25,8 @@ except ImportError:
 
 load_dotenv()
 
+# 把模型配置放在环境变量中，代码本身只负责读取配置。
+# 这样可以在不修改源码的情况下切换模型、接口地址和循环上限。
 MODEL = os.getenv("DEEPSEEK_MODEL", "deepseek-flash")
 BASE_URL = os.getenv("DEEPSEEK_BASE_URL", "https://api.deepseek.com")
 API_KEY = os.getenv("DEEPSEEK_API_KEY")
@@ -38,6 +40,8 @@ client = OpenAI(api_key=API_KEY, base_url=BASE_URL)
 
 
 def tool_schema(name: str, description: str, properties: dict, required=None) -> dict:
+    # OpenAI 兼容接口使用 JSON Schema 描述工具参数。
+    # 模型看到的是这个“说明书”，真正执行仍然要经过 SafeTools.dispatch()。
     return {
         "type": "function",
         "function": {
@@ -53,6 +57,8 @@ def tool_schema(name: str, description: str, properties: dict, required=None) ->
     }
 
 
+# 工具尽量保持少量：通用的列目录、搜索和检查交给 bash，
+# 文件读写则用结构更明确的 read / write / edit 表达。
 TOOLS = [
     tool_schema(
         "read",
@@ -106,6 +112,7 @@ class SessionStore:
         if not self.path or not self.path.is_file():
             return []
         messages = []
+        # 一行一条 JSON，某一行损坏时跳过它，不影响剩余历史记录加载。
         for line in self.path.read_text(encoding="utf-8").splitlines():
             try:
                 messages.append(json.loads(line))
@@ -116,6 +123,7 @@ class SessionStore:
     def append(self, message: dict) -> None:
         if not self.path:
             return
+        # ensure_ascii=False 让中文保持可读，后续也方便直接打开 JSONL 学习消息结构。
         with self.path.open("a", encoding="utf-8") as handle:
             handle.write(json.dumps(message, ensure_ascii=False) + "\n")
 
@@ -155,6 +163,8 @@ class SafeTools:
         self.workspace = workspace.resolve()
 
     def _target(self, user_path: str) -> Path | None:
+        # 工具参数中的路径必须是相对路径，并且解析后仍在工作区内。
+        # resolve() 可以处理 ../ 这类路径，避免用字符串拼接绕过目录边界。
         candidate = Path(user_path).expanduser()
         if candidate.is_absolute():
             return None
@@ -170,10 +180,12 @@ class SafeTools:
         """非交互环境默认拒绝写入和执行，避免 Agent 悄悄修改用户文件。"""
         if not sys.stdin.isatty():
             return False
+        # 只把“是否执行”的决定交给用户，不把安全判断交给模型自己承诺。
         answer = input(f"\n[需要确认] {action}\n允许吗？[y/N] ").strip().lower()
         return answer in {"y", "yes", "是"}
 
     def read(self, path: str, start_line: int = 1, end_line: int = 160) -> str:
+        # 读取工具是只读操作，所以不需要确认；但仍然要经过路径和大小检查。
         target = self._target(path)
         if not target or not target.is_file():
             return "Error: 文件不存在、越过工作区，或属于受保护目录。"
@@ -189,6 +201,7 @@ class SafeTools:
         return "\n".join(selected) or "(文件为空)"
 
     def write(self, path: str, content: str) -> str:
+        # 写入和编辑会改变工作区，必须先通过统一的确认入口。
         target = self._target(path)
         if not target:
             return "Error: 目标路径越过工作区或属于受保护目录。"
@@ -201,6 +214,7 @@ class SafeTools:
         return f"已写入 {target.relative_to(self.workspace)}。"
 
     def edit(self, path: str, old_text: str, new_text: str) -> str:
+        # 要求 old_text 只出现一次，可以避免模型因为匹配过宽而误改多个位置。
         target = self._target(path)
         if not target or not target.is_file():
             return "Error: 文件不存在、越过工作区，或属于受保护目录。"
@@ -215,6 +229,8 @@ class SafeTools:
 
     def _bash_is_read_only(self, command: str) -> bool:
         """只自动放行一个简单的只读命令，组合命令统一要求确认。"""
+        # 这里不是完整的 Shell 解析器，而是教学示例中的保守白名单。
+        # 只要出现管道、重定向或命令替换，就要求用户明确确认。
         if not command.strip() or any(operator in command for operator in (";", "&&", "||", "|", ">", "<", "`", "$(")):
             return False
         try:
@@ -241,6 +257,7 @@ class SafeTools:
         return True
 
     def bash(self, command: str) -> str:
+        # bash 是能力出口：模型可以提出命令，但能否执行由这里的规则决定。
         normalized = command.casefold()
         if any(part in normalized for part in self.BLOCKED_COMMAND_PARTS):
             return "Bash blocked: 命令触及 .env、.git、虚拟环境、会话目录或系统敏感路径。"
@@ -267,6 +284,7 @@ class SafeTools:
         return f"exit_code={completed.returncode}\n{output[-8000:]}"
 
     def dispatch(self, name: str, arguments: dict) -> str:
+        # 所有工具调用都从同一个入口进入，便于集中记录、拦截和扩展。
         handlers = {
             "read": self.read,
             "write": self.write,
@@ -308,10 +326,12 @@ class CodingAgent:
         self.tools = SafeTools(workspace)
         self.session = session
         self.messages = session.load()
+        # 没有历史消息时，先放入 system 消息，给模型说明角色、边界和工具用法。
         if not self.messages or self.messages[0].get("role") != "system":
             self.messages = [{"role": "system", "content": self.system_prompt()}]
 
     def system_prompt(self) -> str:
+        # system prompt 负责告诉模型“应该怎么做”，但不能替代程序的安全检查。
         return (
             "你是一个谨慎、简洁的中文 Coding Agent。\n"
             f"当前工作区：{self.workspace}\n"
@@ -338,10 +358,12 @@ class CodingAgent:
         return has_path
 
     def save(self, message: dict) -> None:
+        # 消息同时进入内存和 JSONL：内存供当前请求使用，文件供下次会话恢复。
         self.messages.append(message)
         self.session.append(message)
 
     def reset(self) -> None:
+        # /clear 只清空当前上下文，不删除磁盘上的历史，方便回看学习。
         self.messages = [{"role": "system", "content": self.system_prompt()}]
 
     def run(self, request: str) -> str:
@@ -356,6 +378,7 @@ class CodingAgent:
             self.save(message.model_dump(exclude_none=True))
             return message.content or ""
 
+        # Agent Loop 的核心：模型决定下一步 -> 程序执行工具 -> 结果回到模型。
         for turn in range(1, MAX_TURNS + 1):
             response = client.chat.completions.create(
                 model=MODEL,
@@ -366,10 +389,13 @@ class CodingAgent:
             message = response.choices[0].message
             assistant = message.model_dump(exclude_none=True)
             self.save(assistant)
+            # 没有 tool_calls 代表模型认为信息已经足够，可以直接回答并结束本轮任务。
             if not message.tool_calls:
                 return message.content or ""
             for tool_call in message.tool_calls:
                 try:
+                    # 工具参数来自模型生成的 JSON，解析失败时把错误作为工具结果回传，
+                    # 让模型有机会自行修正，而不是让整个 Agent 直接崩溃。
                     arguments = json.loads(tool_call.function.arguments or "{}")
                     print(f"[tool] {tool_call.function.name}({json.dumps(arguments, ensure_ascii=False)})")
                     result = self.tools.dispatch(tool_call.function.name, arguments)
@@ -397,6 +423,7 @@ def print_help() -> None:
 
 
 def main() -> None:
+    # 命令行参数负责启动方式；具体的 Agent 行为仍集中在 CodingAgent 中。
     parser = argparse.ArgumentParser(description="一个参考 Pi Harness 理念实现的简易 Coding Agent")
     parser.add_argument("--workspace", type=Path, default=PROJECT_ROOT, help="工作区路径，默认是本项目根目录")
     parser.add_argument("--session", type=Path, help="继续某个 JSONL 会话")
@@ -411,12 +438,14 @@ def main() -> None:
     agent = CodingAgent(workspace, SessionStore(session_path))
 
     if args.prompt:
+        # 传入一次性任务时执行一轮请求后退出，适合脚本和自动化检查。
         print(agent.run(args.prompt))
         return
 
     print("简易 Coding Agent 已启动。输入 /help 查看帮助，输入 /quit 退出。")
     while True:
         try:
+            # 交互模式把每次输入交给同一个 agent，因此可以保留上下文。
             user_text = input("\n你> ").strip()
         except (EOFError, KeyboardInterrupt):
             print("\n已退出。")
@@ -433,6 +462,7 @@ def main() -> None:
             agent.reset()
             print("当前上下文已清空，会话文件仍然保留。")
             continue
+        # 普通文本才进入模型；斜杠命令由 Harness 本地处理。
         print(f"\nAgent> {agent.run(user_text)}")
 
 
