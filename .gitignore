@@ -6,3 +6,6 @@ __pycache__/
 .tasks/
 .transcripts/
 .task_outputs/
+.scheduled_tasks.json
+.workflow-runtime/
+.coding-agent-sessions/

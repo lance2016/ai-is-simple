@@ -18,6 +18,7 @@ if not API_KEY:
 
 client = OpenAI(api_key=API_KEY, base_url=BASE_URL)
 WORKDIR = Path(__file__).resolve().parents[2]
+MAX_TURNS = 8
 
 TOOLS = [
     {
@@ -100,11 +101,16 @@ def register_hook(event: str, callback) -> None:
 
 
 def trigger_hooks(event: str, *args):
+    """按注册顺序执行所有 Hook，并记住第一个阻止结果。
+
+    这样权限 Hook 可以拦截工具，但日志 Hook 仍然有机会记录这次请求。
+    """
+    blocked = None
     for callback in HOOKS[event]:
         result = callback(*args)
-        if result is not None:
-            return result
-    return None
+        if result is not None and blocked is None:
+            blocked = result
+    return blocked
 
 
 def prompt_log_hook(user_text: str):
@@ -177,7 +183,7 @@ def agent_loop(user_text: str) -> str:
         {"role": "user", "content": user_text},
     ]
 
-    while True:
+    for _ in range(MAX_TURNS):
         response = client.chat.completions.create(
             model=MODEL,
             messages=messages,
@@ -209,6 +215,9 @@ def agent_loop(user_text: str) -> str:
                     "content": result,
                 }
             )
+
+    trigger_hooks("Stop", messages)
+    return "达到最大轮数，循环停止；请检查任务是否真的完成。"
 
 
 if __name__ == "__main__":

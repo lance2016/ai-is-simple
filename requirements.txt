@@ -1,3 +1,4 @@
 openai>=1.0.0
 python-dotenv>=1.0.0
-
+# OpenAI SDK 在 SOCKS 代理环境下需要它。
+socksio>=1.0.0

@@ -18,6 +18,7 @@ if not API_KEY:
 
 client = OpenAI(api_key=API_KEY, base_url=BASE_URL)
 WORKDIR = Path(__file__).resolve().parents[2]
+MAX_TURNS = 8
 
 
 class TodoManager:
@@ -188,7 +189,7 @@ def agent_loop(user_text: str) -> str:
     ]
     rounds_since_todo = 0
 
-    while True:
+    for _ in range(MAX_TURNS):
         response = client.chat.completions.create(
             model=MODEL,
             messages=messages,
@@ -223,6 +224,8 @@ def agent_loop(user_text: str) -> str:
                 }
             )
             rounds_since_todo = 0
+
+    return "达到最大轮数，循环停止；请检查计划和实际结果。"
 
 
 if __name__ == "__main__":

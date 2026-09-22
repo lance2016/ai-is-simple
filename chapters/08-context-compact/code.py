@@ -23,6 +23,7 @@ OUTPUT_DIR = WORKDIR / ".task_outputs" / "tool-results"
 TRANSCRIPT_DIR = WORKDIR / ".transcripts"
 CONTEXT_CHAR_LIMIT = 12000
 LARGE_RESULT_CHAR_LIMIT = 1200
+MAX_TURNS = 8
 
 
 def safe_path(relative_path: str) -> Path:
@@ -209,7 +210,7 @@ def agent_loop(user_text: str) -> str:
         {"role": "user", "content": user_text},
     ]
 
-    while True:
+    for _ in range(MAX_TURNS):
         messages = prepare_context(messages, user_text)
         response = client.chat.completions.create(
             model=MODEL,
@@ -232,6 +233,8 @@ def agent_loop(user_text: str) -> str:
                     "content": result,
                 }
             )
+
+    return "达到最大轮数，循环停止；请检查已保存的结果和当前任务。"
 
 
 if __name__ == "__main__":

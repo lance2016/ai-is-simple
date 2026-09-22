@@ -24,6 +24,9 @@ client = OpenAI(
     base_url=BASE_URL,
 )
 
+# 教学示例也要有停止边界，避免模型或工具异常时无限循环。
+MAX_TURNS = 8
+
 # 先告诉模型：它有哪些工具可以选择。
 TOOLS = [
     {
@@ -73,7 +76,7 @@ def agent_loop(user_text: str) -> str:
         {"role": "user", "content": user_text},
     ]
 
-    while True:
+    for _ in range(MAX_TURNS):
         # 每一轮都把最新消息发给 DeepSeek，让它决定下一步。
         response = client.chat.completions.create(
             model=MODEL,
@@ -101,6 +104,8 @@ def agent_loop(user_text: str) -> str:
                     "content": result,
                 }
             )
+
+    return "达到最大轮数，循环停止；这只表示程序停了，不代表任务一定完成。"
 
 
 if __name__ == "__main__":

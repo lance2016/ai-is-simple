@@ -52,6 +52,8 @@ Hook 可以先理解成：
 
 > **在某个固定时刻，自动调用的一小段函数。**
 
+主循环负责必须发生的事情：请求模型、执行工具、把结果送回上下文。Hook 负责可插拔的旁路逻辑：日志、统计、提醒或权限检查。如果一段逻辑决定了任务下一步是什么，它更适合留在主循环；如果只是“每次经过这里都顺便做一下”，Hook 更合适。
+
 最小的注册表可以这样写：
 
 ```python
@@ -68,11 +70,12 @@ def register_hook(event, callback):
 
 
 def trigger_hooks(event, *args):
+    blocked = None
     for callback in HOOKS[event]:
         result = callback(*args)
-        if result is not None:
-            return result
-    return None
+        if result is not None and blocked is None:
+            blocked = result
+    return blocked
 ```
 
 这里有两个角色：
@@ -103,6 +106,8 @@ register_hook("PreToolUse", permission_hook)
 
 返回 `None` 表示放行；返回一段文字表示拦截当前动作。
 
+回调按注册顺序运行。即使权限 Hook 返回了拦截原因，后面的日志 Hook 仍然会执行；`trigger_hooks()` 只把第一个非空结果作为最终阻止原因返回。这样“拦截”和“记录”不会互相吞掉。
+
 ## 循环只保留触发点
 
 没有 Hook 时，循环容易直接写成：
@@ -127,6 +132,10 @@ else:
 这就是本章的核心变化：
 
 > **扩展逻辑可以增加，但 Agent Loop 的主干不需要不断变长。**
+
+### 什么时候不必上 Hook？
+
+只有一处调用、不会复用的简单判断，直接写在主流程里通常更易读。Hook 的价值在于多个地方都需要同一类行为，或者你希望在不改主流程的情况下插拔它；同时也要接受事件顺序和隐式行为带来的理解成本。
 
 ## 用 DeepSeek 跑起来
 

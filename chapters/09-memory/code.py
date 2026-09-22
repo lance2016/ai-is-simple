@@ -21,6 +21,7 @@ client = OpenAI(api_key=API_KEY, base_url=BASE_URL)
 WORKDIR = Path(__file__).resolve().parents[2]
 MEMORY_DIR = WORKDIR / ".memory"
 MEMORY_INDEX = MEMORY_DIR / "MEMORY.md"
+MAX_TURNS = 8
 
 
 def slugify(name: str) -> str:
@@ -144,7 +145,7 @@ def agent_loop(user_text: str) -> str:
         {"role": "user", "content": user_text},
     ]
 
-    while True:
+    for _ in range(MAX_TURNS):
         response = client.chat.completions.create(
             model=MODEL,
             messages=messages,
@@ -169,6 +170,8 @@ def agent_loop(user_text: str) -> str:
                     "content": str(result),
                 }
             )
+
+    return "达到最大轮数，循环停止；请检查记忆是否需要人工确认。"
 
 
 if __name__ == "__main__":

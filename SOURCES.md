@@ -12,9 +12,20 @@
 - [s08: Context Compact](https://github.com/shareAI-lab/learn-claude-code/tree/main/s08_context_compact)
 - [s09: Memory](https://github.com/shareAI-lab/learn-claude-code/tree/main/s09_memory)
 - [s10: Task System](https://github.com/shareAI-lab/learn-claude-code/tree/main/s10_task_system)
+- [s11: Background Tasks](https://github.com/shareAI-lab/learn-claude-code/tree/main/s11_background_tasks)
+- [s12: Cron Scheduler](https://github.com/shareAI-lab/learn-claude-code/tree/main/s12_cron_scheduler)
+- [s13: Agent Teams](https://github.com/shareAI-lab/learn-claude-code/tree/main/s13_agent_teams)
+- [s14: MCP Plugin](https://github.com/shareAI-lab/learn-claude-code/tree/main/s14_mcp_plugin)
+- [s15: Integrated Harness](https://github.com/shareAI-lab/learn-claude-code/tree/main/s15_integrated_harness)
+- [s16: Workflow Runtime](https://github.com/shareAI-lab/learn-claude-code/tree/main/s16_workflow_runtime)
+- [s17: Goal Loop](https://github.com/shareAI-lab/learn-claude-code/tree/main/s17_goal_loop)
 - [DeepSeek OpenAI SDK 调用示例](https://api-docs.deepseek.com/api_samples/chat_python/)
 - [DeepSeek Tool Calls 官方说明](https://api-docs.deepseek.com/guides/tool_calls/)
 - [OpenAI Chat Completions API](https://platform.openai.com/docs/api-reference/chat)
+- [Pi Agent Harness](https://github.com/earendil-works/pi)
+- [Pi 官方文档](https://pi.dev/docs/latest)
+- [Pi Extensions](https://github.com/earendil-works/pi/blob/main/packages/coding-agent/docs/extensions.md)
+- [Pi Skills](https://github.com/earendil-works/pi/blob/main/packages/coding-agent/docs/skills.md)
 
 原项目采用 MIT License。这里的章节结构、概念顺序和部分术语参考原项目；本项目的中文解释、示例和插画为重新整理内容。
 

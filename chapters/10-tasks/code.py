@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 """第 10 章：把任务、依赖和进度保存到 .tasks/*.json。"""
 
+from __future__ import annotations
+
 import json
 import os
 import re
@@ -22,6 +24,7 @@ client = OpenAI(api_key=API_KEY, base_url=BASE_URL)
 WORKDIR = Path(__file__).resolve().parents[2]
 TASKS_DIR = WORKDIR / ".tasks"
 TASK_ID_PATTERN = re.compile(r"^task_[0-9a-f]{8}$")
+MAX_TURNS = 8
 
 
 class TaskStore:
@@ -142,6 +145,15 @@ def complete_task(task_id: str, owner: str = "agent") -> str:
         return f"任务当前状态是 {task['status']}，不能完成"
     if task["owner"] != owner:
         return f"任务负责人是 {task['owner']}，不是 {owner}"
+
+    # 先记录完成前的可领取状态，避免每次完成任务都重复报告旧的解锁项。
+    ready_before = {
+        candidate["id"]
+        for candidate in TASKS.list()
+        if candidate["status"] == "pending"
+        and candidate["blockedBy"]
+        and TASKS.dependencies_ready(candidate)
+    }
     task["status"] = "completed"
     TASKS.save(task)
 
@@ -150,6 +162,7 @@ def complete_task(task_id: str, owner: str = "agent") -> str:
         for candidate in TASKS.list()
         if candidate["status"] == "pending"
         and candidate["blockedBy"]
+        and candidate["id"] not in ready_before
         and TASKS.dependencies_ready(candidate)
     ]
     result = f"已完成 {task_id}：{task['subject']}"
@@ -257,7 +270,7 @@ def agent_loop(user_text: str) -> str:
         {"role": "user", "content": user_text},
     ]
 
-    while True:
+    for _ in range(MAX_TURNS):
         response = client.chat.completions.create(
             model=MODEL,
             messages=messages,
@@ -285,6 +298,8 @@ def agent_loop(user_text: str) -> str:
                     "content": str(result),
                 }
             )
+
+    return "达到最大轮数，循环停止；请检查任务状态和实际交付物。"
 
 
 if __name__ == "__main__":

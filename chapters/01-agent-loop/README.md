@@ -16,6 +16,14 @@
 
 注意：工具结果回到的是“模型决定”，不是重新回到“用户任务”。用户不会每一轮都重新输入。
 
+还要区分三个“结束”：
+
+- **模型结束**：这次回复没有 `tool_calls`，模型选择直接说话；
+- **循环结束**：程序遇到上面的条件，或达到最大轮数；
+- **任务完成**：用户真正想要的结果已经被验证。
+
+前两个是程序状态，最后一个才是用户目标。模型说“完成了”，不等于文件真的写对了或测试真的通过了。
+
 ## 用生活例子理解
 
 你对一个助理说：
@@ -58,10 +66,10 @@ client = OpenAI(
 )
 ```
 
-真正的循环只有这几步：
+真正的循环只有这几步（完整代码还加了 `MAX_TURNS`，给循环设上限）：
 
 ```python
-while True:
+for _ in range(MAX_TURNS):
     response = client.chat.completions.create(
         model="deepseek-flash",
         messages=messages,
@@ -72,7 +80,7 @@ while True:
     messages.append(message.model_dump(exclude_none=True))
 
     if not message.tool_calls:
-        return message.content
+        return message.content or ""
 
     for call in message.tool_calls:
         result = run_tool(call)
@@ -88,6 +96,12 @@ while True:
 - `message.tool_calls` 有内容：模型想做事，循环继续；
 - `message.tool_calls` 为空：模型不需要工具，循环结束；
 - `role="tool"`：把工具结果送回模型。
+
+### 什么时候会停，什么时候不代表完成？
+
+如果用户问“今天是几号”，模型通常会调用 `get_today`，拿到结果后再回答；如果用户问“Python 是什么”，模型可以直接回答，不需要工具。两种情况都可能触发循环结束，但只有带外部验证的任务，才适合进一步判断“目标是否完成”。
+
+`MAX_TURNS` 是安全护栏，不是成功判断。真实应用还应根据任务类型增加测试、文件检查或人工确认。
 
 ## 最小的 Agent 是什么
 
@@ -112,7 +126,7 @@ while True:
 
 > **模型决定做什么，Harness 负责把它做出来。**
 
-一个工具加一个循环，就构成了一个最小的 Agent。后面的权限、计划、记忆、团队协作，都是在这个基础循环上逐步加出来的。
+一个工具加一个循环，就构成了一个最小的 Agent。后面的权限、计划、记忆、团队协作，都是围绕这个基础循环增加的能力；它们不是每个任务都必须启用。
 
 ## 想一想
 

@@ -19,6 +19,7 @@ if not API_KEY:
 
 client = OpenAI(api_key=API_KEY, base_url=BASE_URL)
 SKILLS_DIR = Path(__file__).parent / "skills"
+MAX_TURNS = 8
 
 
 class SkillLoader:
@@ -121,7 +122,7 @@ def agent_loop(user_text: str) -> str:
         {"role": "user", "content": user_text},
     ]
 
-    while True:
+    for _ in range(MAX_TURNS):
         response = client.chat.completions.create(
             model=MODEL,
             messages=messages,
@@ -146,6 +147,8 @@ def agent_loop(user_text: str) -> str:
                     "content": str(result),
                 }
             )
+
+    return "达到最大轮数，循环停止；请检查技能是否真的被正确使用。"
 
 
 if __name__ == "__main__":

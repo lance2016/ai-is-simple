@@ -18,13 +18,14 @@ if not API_KEY:
 
 client = OpenAI(api_key=API_KEY, base_url=BASE_URL)
 WORKDIR = Path(__file__).resolve().parents[2]
+MAX_TURNS = 8
 
 TOOLS = [
     {
         "type": "function",
         "function": {
             "name": "read_file",
-            "description": "读取项目内的文本文件。",
+            "description": "读取项目内允许访问的文本文件，不读取 .env 等敏感文件。",
             "parameters": {
                 "type": "object",
                 "properties": {"path": {"type": "string"}},
@@ -36,7 +37,7 @@ TOOLS = [
         "type": "function",
         "function": {
             "name": "write_note",
-            "description": "向项目内写入一条笔记。执行前需要用户确认。",
+            "description": "向 notes/ 目录写入一条笔记。执行前需要用户确认。",
             "parameters": {
                 "type": "object",
                 "properties": {
@@ -70,12 +71,38 @@ def safe_path(relative_path: str) -> Path:
     return path
 
 
+SENSITIVE_FILES = {".env", ".env.local", ".env.production", ".env.development"}
+ROOT_READABLE_FILES = {"README.md", "Agents.md", "SOURCES.md", "STYLE_GUIDE.md"}
+
+
+def safe_read_path(relative_path: str) -> Path:
+    """把读取范围限制在教学文档和章节目录，并拒绝敏感文件。"""
+    path = safe_path(relative_path)
+    if path.name in SENSITIVE_FILES or any(part.startswith(".git") for part in path.parts):
+        raise ValueError("出于安全考虑，不能读取 .env 或 .git 等敏感路径")
+
+    is_root_doc = path.parent == WORKDIR and path.name in ROOT_READABLE_FILES
+    is_chapter_file = (WORKDIR / "chapters") in path.parents
+    if not (is_root_doc or is_chapter_file):
+        raise ValueError("示例只允许读取根目录教学文档或 chapters/ 下的文件")
+    return path
+
+
+def safe_write_path(relative_path: str) -> Path:
+    """写入只允许落在 notes/，避免把示例变成任意文件覆盖器。"""
+    path = safe_path(relative_path)
+    notes_dir = WORKDIR / "notes"
+    if notes_dir not in path.parents:
+        raise ValueError("写入范围仅限 notes/ 目录")
+    return path
+
+
 def read_file(path: str) -> str:
-    return safe_path(path).read_text(encoding="utf-8")[:8000]
+    return safe_read_path(path).read_text(encoding="utf-8")[:8000]
 
 
 def write_note(path: str, content: str) -> str:
-    file_path = safe_path(path)
+    file_path = safe_write_path(path)
     file_path.parent.mkdir(parents=True, exist_ok=True)
     file_path.write_text(content, encoding="utf-8")
     return f"已写入 {path}"
@@ -96,12 +123,20 @@ def check_permission(name: str, arguments: dict) -> tuple[bool, str]:
         return False, DENY_LIST[name]
 
     try:
-        safe_path(arguments.get("path", ""))
+        if name == "read_file":
+            safe_read_path(arguments.get("path", ""))
+        elif name == "write_note":
+            safe_write_path(arguments.get("path", ""))
+        else:
+            safe_path(arguments.get("path", ""))
     except ValueError as exc:
         return False, str(exc)
 
     if name == "write_note":
-        choice = input(f"准备写入 {arguments['path']}，允许吗？[y/N] ").strip().lower()
+        content = str(arguments.get("content", ""))
+        choice = input(
+            f"准备写入 {arguments['path']}，完整内容如下：\n{content}\n允许吗？[y/N] "
+        ).strip().lower()
         if choice not in {"y", "yes"}:
             return False, "用户没有确认写入"
 
@@ -138,7 +173,7 @@ def agent_loop(user_text: str) -> str:
         {"role": "user", "content": user_text},
     ]
 
-    while True:
+    for _ in range(MAX_TURNS):
         response = client.chat.completions.create(
             model=MODEL,
             messages=messages,
@@ -160,6 +195,8 @@ def agent_loop(user_text: str) -> str:
                     "content": result,
                 }
             )
+
+    return "达到最大轮数，循环停止；请检查任务是否真的完成。"
 
 
 if __name__ == "__main__":
