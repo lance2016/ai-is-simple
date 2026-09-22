@@ -174,6 +174,7 @@ cp .env.example .env
 ```env
 DEEPSEEK_API_KEY=你的_api_key
 DEEPSEEK_BASE_URL=https://api.deepseek.com
+# DeepSeek-V4.1-Flash 在 API 中的模型名是 deepseek-flash
 DEEPSEEK_MODEL=deepseek-flash
 ```
 

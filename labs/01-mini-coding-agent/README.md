@@ -59,13 +59,18 @@ python labs/01-mini-coding-agent/agent.py \
 
 程序会启用终端行编辑，因此方向键、退格和上下翻阅历史记录都可以正常使用。如果看到 `^[[A`、`^[[D` 之类的字符，通常说明当前运行环境没有启用行编辑；请在真实终端中运行，并确认使用的是项目虚拟环境里的 Python。
 
+如果终端直接显示 `<| ... DSML ...>`，通常是兼容层把工具调用当成普通文字返回。程序会尝试把这种格式转换成工具调用；如果仍然出现，请新开一个会话，并确认模型配置使用的是 DeepSeek-V4.1-Flash 对应的 API 名称 `deepseek-flash`。
+
 开始前，确保 `.env` 中有：
 
 ```env
 DEEPSEEK_API_KEY=你的_api_key
 DEEPSEEK_BASE_URL=https://api.deepseek.com
+# DeepSeek-V4.1-Flash 在 API 中的模型名是 deepseek-flash
 DEEPSEEK_MODEL=deepseek-flash
 ```
+
+如果你把模型写成 `v4.1-flash` 或 `deepseek-v4.1-flash`，程序也会自动兼容映射到官方 API 名称 `deepseek-flash`。
 
 ## 代码怎么对应理论篇？
 

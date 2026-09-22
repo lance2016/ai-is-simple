@@ -46,8 +46,7 @@
 
 ## 代码偏好
 
-- 默认使用 DeepSeek 模型。
-- 默认模型：`deepseek-flash`，允许通过 `DEEPSEEK_MODEL` 覆盖。
+- 默认使用 DeepSeek-V4.1-Flash；DeepSeek API 对应的正式模型名是 `deepseek-flash`，允许通过 `DEEPSEEK_MODEL` 覆盖。不要把 `deepseek-v4.1-flash` 当作 API 必须使用的模型名；代码可以把它兼容映射到 `deepseek-flash`。
 - 默认使用 OpenAI Python SDK。
 - 默认 API 地址：`https://api.deepseek.com`，允许通过 `DEEPSEEK_BASE_URL` 覆盖。
 - API Key 从 `.env` 读取，不要写进代码或提交到 Git。

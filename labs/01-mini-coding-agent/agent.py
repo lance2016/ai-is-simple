@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import html
 import json
 import os
 import re
@@ -26,8 +27,16 @@ except ImportError:
 load_dotenv()
 
 # 把模型配置放在环境变量中，代码本身只负责读取配置。
+# DeepSeek API 中，DeepSeek-V4.1-Flash 对外使用的模型名是 deepseek-flash。
 # 这样可以在不修改源码的情况下切换模型、接口地址和循环上限。
-MODEL = os.getenv("DEEPSEEK_MODEL", "deepseek-flash")
+MODEL_ALIASES = {
+    # 兼容读者可能按产品名填写的版本名，最终仍使用官方 API 模型名。
+    "v4.1-flash": "deepseek-flash",
+    "deepseek-v4.1-flash": "deepseek-flash",
+    "deepseek-v4-flash": "deepseek-flash",
+}
+REQUESTED_MODEL = os.getenv("DEEPSEEK_MODEL", "deepseek-flash").strip().casefold()
+MODEL = MODEL_ALIASES.get(REQUESTED_MODEL, REQUESTED_MODEL)
 BASE_URL = os.getenv("DEEPSEEK_BASE_URL", "https://api.deepseek.com")
 API_KEY = os.getenv("DEEPSEEK_API_KEY")
 MAX_TURNS = int(os.getenv("CODING_AGENT_MAX_TURNS", "12"))
@@ -98,6 +107,48 @@ TOOLS = [
         ["command"],
     ),
 ]
+
+
+# 某些兼容层会把工具调用作为 DSML 文本放进 message.content，而不是放在
+# message.tool_calls 中。这个格式不是标准 Chat Completions 返回值，
+# 这里只做兼容解析，正常情况下仍优先使用原生 tool_calls。
+DSML_INVOKE_RE = re.compile(
+    r'<\s*/?\s*\|\s*\|\s*DSML\s*\|\s*\|\s*invoke\s+'
+    r'name=["\'](?P<name>[^"\']+)["\']\s*>(?P<body>.*?)'
+    r'<\s*/?\s*\|\s*\|\s*DSML\s*\|\s*\|\s*invoke\s*>',
+    re.IGNORECASE | re.DOTALL,
+)
+DSML_PARAMETER_RE = re.compile(
+    r'<\s*/?\s*\|\s*\|\s*DSML\s*\|\s*\|\s*parameter\s+'
+    r'name=["\'](?P<name>[^"\']+)["\'](?:\s+string=["\'][^"\']*["\'])?\s*>'
+    r'(?P<value>.*?)'
+    r'<\s*/?\s*\|\s*\|\s*DSML\s*\|\s*\|\s*parameter\s*>',
+    re.IGNORECASE | re.DOTALL,
+)
+
+
+def parse_dsml_tool_calls(content: str) -> list[dict]:
+    """把兼容层返回的 DSML 文本转换成标准 tool_calls 结构。"""
+    if "dsml" not in content.casefold() or "invoke" not in content.casefold():
+        return []
+
+    calls = []
+    for index, invoke in enumerate(DSML_INVOKE_RE.finditer(content), start=1):
+        arguments = {
+            parameter.group("name"): html.unescape(parameter.group("value")).strip()
+            for parameter in DSML_PARAMETER_RE.finditer(invoke.group("body"))
+        }
+        calls.append(
+            {
+                "id": f"dsml_call_{index}",
+                "type": "function",
+                "function": {
+                    "name": invoke.group("name"),
+                    "arguments": json.dumps(arguments, ensure_ascii=False),
+                },
+            }
+        )
+    return calls
 
 
 class SessionStore:
@@ -337,6 +388,7 @@ class CodingAgent:
             f"当前工作区：{self.workspace}\n"
             "你只有四个工具：read、write、edit、bash。列目录、搜索代码、查看 Git 状态和运行检查，都优先通过 bash 完成。\n"
             "如果用户只是问候、闲聊或询问概念，不需要访问工作区时，直接用文字回答，不要调用工具。\n"
+            "需要操作时请使用接口提供的原生 function tool call，不要把 <| DSML |> 之类的内部格式当作普通文字输出。\n"
             "先阅读和搜索，再提出修改；修改文件或运行需要确认的 Bash 命令前必须调用工具，程序会向用户请求确认。\n"
             "不要访问 .env、.git、.venv 或会话目录。每次修改后说明改了什么，并在用户批准时运行相关检查。"
         )
@@ -388,20 +440,42 @@ class CodingAgent:
             )
             message = response.choices[0].message
             assistant = message.model_dump(exclude_none=True)
+            tool_calls = [
+                {
+                    "id": tool_call.id,
+                    "type": tool_call.type,
+                    "function": {
+                        "name": tool_call.function.name,
+                        "arguments": tool_call.function.arguments,
+                    },
+                }
+                for tool_call in (message.tool_calls or [])
+            ]
+
+            if not tool_calls:
+                # 兼容少数网关把工具调用塞进 content 的情况，避免把原始 DSML
+                # 直接展示给用户。标准返回仍然应该走上面的 message.tool_calls。
+                tool_calls = parse_dsml_tool_calls(message.content or "")
+                if tool_calls:
+                    assistant.pop("content", None)
+                    assistant["tool_calls"] = tool_calls
+                    print("[compat] 已将兼容层返回的 DSML 转换为工具调用")
+
             self.save(assistant)
             # 没有 tool_calls 代表模型认为信息已经足够，可以直接回答并结束本轮任务。
-            if not message.tool_calls:
+            if not tool_calls:
                 return message.content or ""
-            for tool_call in message.tool_calls:
+            for tool_call in tool_calls:
                 try:
                     # 工具参数来自模型生成的 JSON，解析失败时把错误作为工具结果回传，
                     # 让模型有机会自行修正，而不是让整个 Agent 直接崩溃。
-                    arguments = json.loads(tool_call.function.arguments or "{}")
-                    print(f"[tool] {tool_call.function.name}({json.dumps(arguments, ensure_ascii=False)})")
-                    result = self.tools.dispatch(tool_call.function.name, arguments)
+                    arguments = json.loads(tool_call["function"]["arguments"] or "{}")
+                    tool_name = tool_call["function"]["name"]
+                    print(f"[tool] {tool_name}({json.dumps(arguments, ensure_ascii=False)})")
+                    result = self.tools.dispatch(tool_name, arguments)
                 except json.JSONDecodeError as exc:
                     result = f"Error: 工具参数不是有效 JSON：{exc}"
-                tool_message = {"role": "tool", "tool_call_id": tool_call.id, "content": result}
+                tool_message = {"role": "tool", "tool_call_id": tool_call["id"], "content": result}
                 self.save(tool_message)
                 print(f"[result] {result[:300]}")
         return f"达到 {MAX_TURNS} 轮上限，已停止自动执行；请检查当前会话后再继续。"
