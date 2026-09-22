@@ -6,6 +6,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import re
 import shlex
 import subprocess
 import sys
@@ -275,6 +276,26 @@ class SafeTools:
 
 
 class CodingAgent:
+    # 先做一个很轻量的 Harness 分流：普通聊天不需要把工具暴露给模型。
+    TOOL_INTENT_WORDS = (
+        "文件", "目录", "代码", "项目", "仓库", "终端", "命令", "脚本", "测试",
+        "读取", "查看", "搜索", "列出", "修改", "编辑", "写入", "创建", "删除",
+        "运行", "执行", "检查", "实现", "修复", "重构", "部署", "read", "write",
+        "edit", "bash", "list", "search", "file", "folder", "directory", "repo",
+        "code", "run", "test", "check", "fix", "implement", "refactor", "git", "pytest",
+        "npm", "python",
+    )
+    GREETING_ONLY = re.compile(
+        r"^(hi|hello|hey|yo|你好|您好|嗨|哈喽|早上好|晚上好|晚安|在吗|谢谢|感谢)[!！,.，。？?\s~～]*$",
+        re.IGNORECASE,
+    )
+    CONCEPT_HINTS = ("什么是", "是什么", "怎么理解", "解释一下", "介绍一下", "为什么", "区别", "原理", "概念")
+    WORK_ACTION_WORDS = (
+        "读取", "查看", "列出", "搜索", "修改", "编辑", "写入", "创建", "删除", "运行", "执行",
+        "检查", "实现", "修复", "重构", "部署", "read", "write", "edit", "bash", "list", "search",
+        "run", "test", "check", "fix", "implement", "refactor", "git", "pytest", "npm", "python",
+    )
+
     def __init__(self, workspace: Path, session: SessionStore):
         self.workspace = workspace
         self.tools = SafeTools(workspace)
@@ -288,9 +309,26 @@ class CodingAgent:
             "你是一个谨慎、简洁的中文 Coding Agent。\n"
             f"当前工作区：{self.workspace}\n"
             "你只有四个工具：read、write、edit、bash。列目录、搜索代码、查看 Git 状态和运行检查，都优先通过 bash 完成。\n"
+            "如果用户只是问候、闲聊或询问概念，不需要访问工作区时，直接用文字回答，不要调用工具。\n"
             "先阅读和搜索，再提出修改；修改文件或运行需要确认的 Bash 命令前必须调用工具，程序会向用户请求确认。\n"
             "不要访问 .env、.git、.venv 或会话目录。每次修改后说明改了什么，并在用户批准时运行相关检查。"
         )
+
+    @classmethod
+    def needs_tools(cls, request: str) -> bool:
+        """判断请求是否可能需要工作区能力；不确定时保持聊天模式更自然。"""
+        text = request.strip().casefold()
+        if not text or cls.GREETING_ONLY.fullmatch(text):
+            return False
+        has_path = bool(re.search(r"(?:^|[\s`])(?:\.{0,2}/|[\w.-]+\.(?:py|md|ts|js|json|toml|yaml|yml))", text))
+        if any(hint in text for hint in cls.CONCEPT_HINTS) and not has_path and not any(
+            word in text for word in cls.WORK_ACTION_WORDS
+        ):
+            return False
+        if any(word in text for word in cls.TOOL_INTENT_WORDS):
+            return True
+        # 文件扩展名和相对路径通常已经足够说明用户想操作项目。
+        return has_path
 
     def save(self, message: dict) -> None:
         self.messages.append(message)
@@ -301,6 +339,16 @@ class CodingAgent:
 
     def run(self, request: str) -> str:
         self.save({"role": "user", "content": request})
+        # 闲聊时不把工具定义发给模型，避免模型为了“做点什么”而误调用 bash。
+        if not self.needs_tools(request):
+            response = client.chat.completions.create(
+                model=MODEL,
+                messages=self.messages,
+            )
+            message = response.choices[0].message
+            self.save(message.model_dump(exclude_none=True))
+            return message.content or ""
+
         for turn in range(1, MAX_TURNS + 1):
             response = client.chat.completions.create(
                 model=MODEL,

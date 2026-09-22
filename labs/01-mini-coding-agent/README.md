@@ -10,8 +10,8 @@
 
 看图时只抓住三件事：
 
-- 用户先提出任务；
-- DeepSeek 决定下一步，调用 `read / write / edit / bash`；
+- 用户先输入一句话，Harness 先判断它是不是需要操作工作区；
+- 普通聊天直接回复，工作任务才交给 DeepSeek 调用 `read / write / edit / bash`；
 - 工具结果回到循环，权限确认和会话记录由程序负责。
 
 这张图展示的是本项目的 Python 教学实现，不是 Pi 的内部架构图。它借鉴了 Pi 的核心取舍：模型提出下一步，Harness 负责执行；工具保持少量，列目录、搜索和检查等动作交给 `bash`。Pi 的完整实现使用 TypeScript/Node.js，本实战则用 Python + DeepSeek 把同一类最小循环跑通。
@@ -26,6 +26,15 @@
 | `write` | 创建或覆盖文件 | 是 |
 | `edit` | 精确替换一段文本 | 是 |
 | `bash` | 列文件、搜索、查看状态、运行检查 | 视命令而定 |
+
+但不是每条消息都会进入工具循环：
+
+```text
+你好 / 解释一下 Agent Loop  →  普通聊天 → 直接回答
+修改 README / 运行测试      →  工作任务 → 进入 Agent Loop
+```
+
+这是一个很小但很重要的分流。否则用户只说一句“你好”，模型也可能为了调用工具而调用工具。
 
 把“列文件”“搜索文本”“运行测试”分别做成工具当然可以，但工具一多，模型要记的接口也会变多。这里借鉴 Pi：把通用命令收进 `bash`，只保留最稳定的文件读写接口。
 
@@ -61,6 +70,7 @@ DEEPSEEK_MODEL=deepseek-flash
 | 理论篇 | 实战代码 |
 |---|---|
 | Agent Loop | `CodingAgent.run()` |
+| 意图分流 | `CodingAgent.needs_tools()` |
 | Tool Use | 4 个工具定义、`TOOLS` 和 `SafeTools.dispatch()` |
 | Permission | `SafeTools._target()`、`_confirm()` |
 | Hooks 思路 | `dispatch()` 作为统一工具入口 |
@@ -92,9 +102,10 @@ python labs/01-mini-coding-agent/agent.py \
 这里没有复制 Pi 的代码，而是用 Python 重现它背后的几个重要理念：
 
 1. 核心循环尽量简单；
-2. 工具通过统一接口注册和执行；
-3. 能力通过扩展增加，而不是重写 Agent Loop；
-4. 会话和工具边界由 Harness 管理；本项目另外加了适合教学的权限确认。
+2. 普通聊天不必暴露工具，工作任务才进入工具循环；
+3. 工具通过统一接口注册和执行；
+4. 能力通过扩展增加，而不是重写 Agent Loop；
+5. 会话和工具边界由 Harness 管理；本项目另外加了适合教学的权限确认。
 
 扩展阅读：
 

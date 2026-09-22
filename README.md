@@ -118,7 +118,7 @@ Planning / Subagents / Memory / MCP ...
 
 | 状态 | 实战 | 核心内容 |
 | --- | --- | --- |
-| ✅ | [01 · Mini Coding Agent](./labs/01-mini-coding-agent/) | 用 Python + DeepSeek 实现 `read / write / edit / bash` 和会话记录 |
+| ✅ | [01 · Mini Coding Agent](./labs/01-mini-coding-agent/) | 用 Python + DeepSeek 实现聊天分流、`read / write / edit / bash` 和会话记录 |
 | 📖 | Pi 扩展阅读 | 理解 TypeScript/Node.js Harness 如何通过 Extension、Skill、Session 和 SDK 扩展 |
 
 实战篇不会复制 Pi 的代码，而是参考它的设计理念，先让读者拥有一个自己能读懂、能修改、能运行的最小版本，再理解更完整的工程实现。
