@@ -118,7 +118,7 @@ Planning / Subagents / Memory / MCP ...
 
 | 状态 | 实战 | 核心内容 |
 | --- | --- | --- |
-| ✅ | [01 · Mini Coding Agent](./labs/01-mini-coding-agent/) | 用 Python + DeepSeek 实现聊天分流、`read / write / edit / bash` 和会话记录 |
+| ✅ | [01 · Mini Coding Agent](./labs/01-mini-coding-agent/) | 用 Python + DeepSeek 实现 `read / write / edit / bash` 四个工具，配一个网页界面：流式输出、逐步展示 tool call、改动前等你授权 |
 | 📖 | Pi 扩展阅读 | 理解 TypeScript/Node.js Harness 如何通过 Extension、Skill、Session 和 SDK 扩展 |
 
 实战篇不会复制 Pi 的代码，而是参考它的设计理念，先让读者拥有一个自己能读懂、能修改、能运行的最小版本，再理解更完整的工程实现。
@@ -189,9 +189,10 @@ python chapters/00-chat-completion/code.py
 如果想直接运行实战篇：
 
 ```bash
-python labs/01-mini-coding-agent/agent.py \
-  "用 bash 列出 labs/01-mini-coding-agent，然后读取 README.md，总结这个 Agent 的四个工具"
+python labs/01-mini-coding-agent/server.py
 ```
+
+然后打开 <http://127.0.0.1:8765>，在输入框里试试：「看看 labs 目录里有什么，读一下里面的 README」。
 
 ---
 
@@ -313,7 +314,9 @@ ai-is-simple/
 └── labs/
     └── 01-mini-coding-agent/
         ├── README.md
-        └── agent.py
+        ├── agent.py      # Agent 内核
+        ├── server.py     # 网页界面的后端
+        └── web/          # 前端页面
 ```
 
 每个章节都是一个独立的小单元：
