@@ -68,27 +68,42 @@ python labs/01-mini-coding-agent/server.py
 python labs/01-mini-coding-agent/server.py --workspace ~/some-project
 ```
 
-界面把一次任务画成一条执行轨道。轨道上的标记形状和颜色说明这一步是谁在动：
+界面参考了 Claude Code 的样子：模型的回复按 Markdown 渲染，边生成边显示；每次工具调用默认折叠成两行，例如：
 
-- 紫色圆点 —— 模型在说话；
-- 青色菱形 —— 程序在执行工具；
-- 琥珀方块 —— 停下来等你决定。
+```text
+● Bash  ls labs
+  ⎿ exit 0 · 3 行输出
+```
 
-每次工具调用是一张卡片，参数按工具类型展示：`bash` 显示命令行，`read` 显示文件和行范围，`write` 显示将要写入的真实内容，`edit` 显示红绿 diff。卡片底部的「原始 JSON」能看到模型实际发出的参数原文——这才是 tool call 在协议层的样子。
+圆点颜色表示状态：灰色闪烁是正在执行，绿色是成功，红色是出错或被拒绝，黄色是等你决定。工具名标签的颜色和上面配图里的工具卡片一致：`read` 黄、`write` 蓝、`edit` 绿、`bash` 粉。
 
-只读命令会标注「只读，自动执行」并带上耗时；需要授权的步骤把授权框放进同一张卡片，你能看清它要做什么再决定，决定完就收成一行。如果那张卡滚出了屏幕，底部会浮出提示——Agent 此刻正阻塞着等你。
+点开一行能看到详情：`bash` 显示命令，`read` 显示带行号、按文件类型高亮的内容，`write` 显示将要写入的代码，`edit` 显示红绿 diff。最下面的「原始 JSON」是模型实际发出的参数原文——这才是 tool call 在协议层的样子。
+
+需要授权的步骤会自动展开，授权按钮就在内容下面，你看清了再决定，决定完它会自己收起来。如果那一行滚出了屏幕，底部会浮出提示；切到别的标签页，标签标题会变成「等你决定」——Agent 此刻正阻塞着等你。
+
+几个顺手的操作：
+
+- 按 `Y` 允许、`N` 拒绝，不用去找按钮；
+- 任务跑偏了，点「停止」或者按 `Esc`；
+- 代码和命令输出都有「复制」按钮，复制 `read` 的结果时会自动去掉行号；
+- 「新对话」只清空上下文，已经改动的文件不会回滚。
 
 网页只负责看和点。真正的路径检查、命令判断、权限判断都在 Python 里；关掉网页或者拒绝授权，模型没有别的路可以绕过去。
 
 ## 代码结构
 
-一共两个 Python 文件，各管一件事：
+两个 Python 文件，加上一个不需要构建的前端：
 
 ```text
-agent.py    Agent 内核：工具定义、工作区边界、模型循环
-server.py   网页界面：HTTP 接口 + SSE 事件流 + 授权开关
-web/index.html   单文件前端
+agent.py           Agent 内核：工具定义、工作区边界、模型循环
+server.py          网页界面：HTTP 接口 + SSE 事件流 + 授权开关
+web/index.html     页面骨架
+web/app.js         前端核心：连事件流、按事件更新页面、发送输入和授权
+web/render.js      渲染：Markdown、代码高亮、工具摘要和详情视图
+web/style.css      样式
 ```
+
+Markdown 解析（marked）、HTML 清洗（DOMPurify）和代码高亮（highlight.js）从 CDN 加载。模型的输出不可信，渲染成 HTML 之前一定先过 DOMPurify。断网时这几个库加载不到，页面会退回纯文本显示。
 
 `agent.py` 完全不知道浏览器的存在。它和界面只靠两个回调连接：
 
@@ -129,20 +144,30 @@ class WriteTool(Tool):
 ```python
 for _ in range(MAX_TURNS):
     message = self._ask_model()
-    self.messages.append(message.model_dump(exclude_none=True))
-    if message.content:
-        self.emit({"type": "assistant_message", "content": message.content})
-    if not message.tool_calls:      # 模型不要工具了，任务结束
+    self.messages.append(message)
+    if message["content"]:
+        self.emit({"type": "assistant_message", "content": message["content"]})
+    if not message.get("tool_calls"):   # 模型不要工具了，任务结束
         return
-    for call in message.tool_calls:
+    for call in message["tool_calls"]:
         self._handle_tool_call(call)
 ```
 
 就这么点东西。循环的出口只有一个：模型这一轮没有请求工具。
 
+### 为什么要流式
+
+`_ask_model()` 请求时带了 `stream=True`。不开的话，模型要把整段话生成完才返回，写一个大文件时，你可能对着空白等十几秒。
+
+开了流式以后，模型每吐出一小段文字，就发一个 `assistant_delta` 事件，页面马上接着显示。tool call 也是分片到的：同一个 `index` 的 id、名字、参数片段要自己拼起来，拼完才是一个完整的调用。
+
+流式只改变「你什么时候看到」，不改变循环本身：拼好的消息照样进 `messages`，工具照样等参数完整了才执行。
+
 ### 授权是怎么从浏览器传回来的
 
 Agent 跑在后台线程。它调 `confirm(...)` 时，`PermissionGate` 做三件事：发一个 `permission_request` 事件到页面、阻塞等待、被 `/api/permission` 唤醒后返回 `True` 或 `False`。超过 5 分钟没人理，默认当作拒绝——宁可不做，也不要背着你动文件。
+
+停止也走同一条路：`/api/stop` 让 `CodingAgent` 立一个停止标记，同时把还在等的授权请求当作拒绝。Agent 只在安全的地方检查这个标记：收流的间隙、每个工具执行之前。正在跑的那条 bash 命令不会被打断，但它之后的步骤都不会再执行。
 
 页面这边用 SSE 收事件。每条事件都有编号，所以刷新页面或者断线重连，带上上次的编号就能接着读，不丢也不重。
 

@@ -24,7 +24,15 @@ from urllib.parse import parse_qs, urlparse
 
 from agent import CodingAgent, Workspace
 
-INDEX_FILE = Path(__file__).resolve().parent / "web" / "index.html"
+WEB_DIR = Path(__file__).resolve().parent / "web"
+# 前端只有这几个文件，写死成白名单，URL 里再怎么拼路径也拿不到别的东西。
+STATIC_FILES = {
+    "/": ("index.html", "text/html; charset=utf-8"),
+    "/index.html": ("index.html", "text/html; charset=utf-8"),
+    "/app.js": ("app.js", "text/javascript; charset=utf-8"),
+    "/render.js": ("render.js", "text/javascript; charset=utf-8"),
+    "/style.css": ("style.css", "text/css; charset=utf-8"),
+}
 
 
 class EventLog:
@@ -79,6 +87,14 @@ class PermissionGate:
         self.events.publish({"type": "permission_result", "request_id": request_id, "allowed": allowed})
         return allowed
 
+    def cancel_all(self) -> None:
+        """任务被停止时调用：还在等答复的请求一律当作拒绝，让 Agent 线程尽快醒过来。"""
+        with self._condition:
+            for request_id, answer in self._pending.items():
+                if answer is None:
+                    self._pending[request_id] = False
+            self._condition.notify_all()
+
     def resolve(self, request_id: str, allowed: bool) -> bool:
         """页面点击后调用。找不到对应请求说明它已经超时或被处理过了。"""
         with self._condition:
@@ -123,6 +139,14 @@ class AgentSession:
                 self._running = False
             self.events.publish({"type": "idle"})
 
+    def stop(self) -> bool:
+        with self._lock:
+            if not self._running:
+                return False
+        self.agent.stop()
+        self.gate.cancel_all()
+        return True
+
     def reset(self) -> bool:
         with self._lock:
             if self._running:
@@ -133,7 +157,7 @@ class AgentSession:
 
 
 class RequestHandler(BaseHTTPRequestHandler):
-    """四个接口：一个页面、一条事件流、发消息、答复授权。"""
+    """前端静态文件，加上几个接口：事件流、发消息、答复授权、清空上下文。"""
 
     protocol_version = "HTTP/1.1"
     server_version = "MiniCodingAgent/2.0"
@@ -151,8 +175,9 @@ class RequestHandler(BaseHTTPRequestHandler):
         path = urlparse(self.path).path
         if path == "/api/events":
             self._stream_events()
-        elif path in ("/", "/index.html"):
-            self._send_bytes(INDEX_FILE.read_bytes(), "text/html; charset=utf-8")
+        elif path in STATIC_FILES:
+            name, content_type = STATIC_FILES[path]
+            self._send_bytes((WEB_DIR / name).read_bytes(), content_type)
         else:
             self.send_error(HTTPStatus.NOT_FOUND)
 
@@ -171,6 +196,9 @@ class RequestHandler(BaseHTTPRequestHandler):
                 str(payload.get("request_id", "")), bool(payload.get("allowed"))
             )
             self._send_json({"resolved": resolved}, HTTPStatus.OK if resolved else HTTPStatus.NOT_FOUND)
+        elif self.path == "/api/stop":
+            stopped = self.session.stop()
+            self._send_json({"stopped": stopped}, HTTPStatus.OK if stopped else HTTPStatus.CONFLICT)
         elif self.path == "/api/reset":
             done = self.session.reset()
             self._send_json({"reset": done}, HTTPStatus.OK if done else HTTPStatus.CONFLICT)
@@ -212,7 +240,7 @@ class RequestHandler(BaseHTTPRequestHandler):
         if length > 1_000_000:
             raise ValueError("请求体太大。")
         if length == 0:
-            return {}  # /api/reset 不需要参数，空请求体是正常的。
+            return {}  # /api/reset 和 /api/stop 不需要参数，空请求体是正常的。
         return json.loads(self.rfile.read(length).decode("utf-8"))
 
     def _send_json(self, payload: dict, status: HTTPStatus = HTTPStatus.OK) -> None:

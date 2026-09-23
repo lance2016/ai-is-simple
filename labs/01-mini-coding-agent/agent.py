@@ -18,6 +18,7 @@ import json
 import os
 import shlex
 import subprocess
+import threading
 from collections.abc import Callable
 from pathlib import Path
 
@@ -271,6 +272,8 @@ class CodingAgent:
         self.emit = emit
         self.client = client or create_client()
         self.messages: list[dict] = [self._system_message()]
+        # 用户随时可能喊停。停止只在"安全的缝隙"里生效：收流的间隙、每个工具执行之前。
+        self._stop = threading.Event()
 
     def _system_message(self) -> dict:
         return {"role": "system", "content": SYSTEM_PROMPT.format(workspace=self.workspace.root)}
@@ -279,35 +282,95 @@ class CodingAgent:
         """只清空上下文。工作区里已经改过的文件不会回滚。"""
         self.messages = [self._system_message()]
 
+    def stop(self) -> None:
+        """可以从别的线程调用。正在跑的那条 bash 命令不会被打断，但它之后的步骤都不会再执行。"""
+        self._stop.set()
+
     def run(self, request: str) -> None:
         """跑完一轮任务。过程通过 emit 广播，不返回字符串。"""
+        self._stop.clear()
         self.messages.append({"role": "user", "content": request})
         self.emit({"type": "user_message", "content": request})
 
         for _ in range(MAX_TURNS):
             message = self._ask_model()
-            self.messages.append(message.model_dump(exclude_none=True))
-            if message.content:
-                self.emit({"type": "assistant_message", "content": message.content})
-            # 模型这一轮没要工具，说明它认为信息够了，任务到此结束。
-            if not message.tool_calls:
+            if self._stop.is_set():
+                # 半截的 tool call 参数不完整，不能执行，也不能留在上下文里：
+                # 接口要求每个 tool call 都有对应的结果，留下它下一轮请求会直接报错。
+                if message["content"]:
+                    self.messages.append({"role": "assistant", "content": message["content"]})
+                    self.emit({"type": "assistant_message", "content": message["content"]})
+                self.emit({"type": "stopped"})
                 return
-            for call in message.tool_calls:
+            self.messages.append(message)
+            if message["content"]:
+                self.emit({"type": "assistant_message", "content": message["content"]})
+            # 模型这一轮没要工具，说明它认为信息够了，任务到此结束。
+            if not message.get("tool_calls"):
+                return
+            for call in message["tool_calls"]:
                 self._handle_tool_call(call)
+            if self._stop.is_set():
+                self.emit({"type": "stopped"})
+                return
 
         self.emit({"type": "assistant_message", "content": f"连续执行了 {MAX_TURNS} 轮还没结束，先停下来等你确认。"})
 
-    def _ask_model(self):
-        response = self.client.chat.completions.create(
+    def _ask_model(self) -> dict:
+        """流式请求模型：文字边生成边推给界面，最后拼回一条完整的 assistant 消息。
+
+        不开流式的话，模型要把整段话（或整个 write 的文件内容）生成完才返回，
+        用户只能对着空白干等；开了流式，第一个字出来就能看到。
+        """
+        self.emit({"type": "thinking"})
+        stream = self.client.chat.completions.create(
             model=MODEL,
             messages=self.messages,
             tools=[tool.schema() for tool in TOOLS.values()],
             tool_choice="auto",
+            stream=True,
         )
-        return response.choices[0].message
+        content: list[str] = []
+        reasoning: list[str] = []
+        calls: dict[int, dict] = {}
+        for chunk in stream:
+            if self._stop.is_set():
+                stream.close()
+                break
+            if not chunk.choices:
+                continue
+            delta = chunk.choices[0].delta
+            if delta.content:
+                content.append(delta.content)
+                self.emit({"type": "assistant_delta", "content": delta.content})
+            # 思考模式会把推理过程单独放在 reasoning_content 里，原样留着，下一轮请求还要带上。
+            piece = getattr(delta, "reasoning_content", None)
+            if piece:
+                reasoning.append(piece)
+            # tool call 也是一小块一小块到的：同一个 index 的 id、名字、参数片段要拼在一起。
+            for part in delta.tool_calls or []:
+                call = calls.setdefault(
+                    part.index, {"id": "", "type": "function", "function": {"name": "", "arguments": ""}}
+                )
+                if part.id:
+                    call["id"] = part.id
+                if part.function and part.function.name:
+                    call["function"]["name"] += part.function.name
+                    # 名字先到、参数后到。大文件的 write 参数可能要生成好几秒，先告诉界面在忙什么。
+                    self.emit({"type": "tool_call_pending", "name": call["function"]["name"]})
+                if part.function and part.function.arguments:
+                    call["function"]["arguments"] += part.function.arguments
 
-    def _handle_tool_call(self, call) -> None:
-        raw_arguments = call.function.arguments or "{}"
+        message: dict = {"role": "assistant", "content": "".join(content)}
+        if reasoning:
+            message["reasoning_content"] = "".join(reasoning)
+        if calls:
+            message["tool_calls"] = [calls[index] for index in sorted(calls)]
+        return message
+
+    def _handle_tool_call(self, call: dict) -> None:
+        name = call["function"]["name"]
+        raw_arguments = call["function"]["arguments"] or "{}"
         try:
             arguments = json.loads(raw_arguments)
         except json.JSONDecodeError:
@@ -315,29 +378,32 @@ class CodingAgent:
 
         self.emit({
             "type": "tool_call",
-            "call_id": call.id,
-            "name": call.function.name,
+            "call_id": call["id"],
+            "name": name,
             "arguments": arguments if arguments is not None else raw_arguments,
         })
 
         if arguments is None:
             result = "Error: 工具参数不是合法 JSON，请重新生成。"
         else:
-            result = self._execute(call.function.name, arguments)
+            result = self._execute(name, arguments)
 
         # 工具结果必须以 role=tool 回到消息列表，模型下一轮才看得到。
-        self.messages.append({"role": "tool", "tool_call_id": call.id, "content": result})
-        self.emit({"type": "tool_result", "call_id": call.id, "content": result})
+        self.messages.append({"role": "tool", "tool_call_id": call["id"], "content": result})
+        self.emit({"type": "tool_result", "call_id": call["id"], "content": result})
 
     def _execute(self, name: str, arguments: dict) -> str:
         """工具的唯一执行入口：先问要不要授权，再真正执行，出错也只返回文字。"""
+        # 同一轮里排在后面的工具，停止之后也要给一个结果，保证每个 tool call 都有回应。
+        if self._stop.is_set():
+            return "Blocked: 任务已停止。"
         tool = TOOLS.get(name)
         if tool is None:
             return f"Error: 没有名为 {name} 的工具。"
         try:
             action = tool.confirm_prompt(self.workspace, **arguments)
             if action and not self.confirm(action):
-                return "Blocked: 用户拒绝了这一步。"
+                return "Blocked: 任务已停止。" if self._stop.is_set() else "Blocked: 用户拒绝了这一步。"
             return tool.run(self.workspace, **arguments)
         except ToolError as exc:
             return f"Error: {exc}"
