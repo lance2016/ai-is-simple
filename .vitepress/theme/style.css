@@ -1,0 +1,13 @@
+/* Course images are the main teaching material: show them as clean cards. */
+.vp-doc img {
+  display: block;
+  margin: 16px auto;
+  border: 1px solid var(--vp-c-divider);
+  border-radius: 8px;
+  cursor: zoom-in;
+}
+
+.medium-zoom-overlay,
+.medium-zoom-image--opened {
+  z-index: 100;
+}

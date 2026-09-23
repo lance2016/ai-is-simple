@@ -20,6 +20,7 @@
 - 工具调用只使用 OpenAI 兼容接口返回的原生 `message.tool_calls`，不做 DSML 等文本格式的兼容解析。
 - 介绍 Pi 时要区分“默认四工具”与“本项目的安全实现”：Pi 默认并不以内置权限弹窗为核心；如果教学实现增加确认、工作区限制或会话策略，图文必须标明这是本项目额外加入的 Harness 层。
 - Pi 只作为扩展阅读或 TypeScript 实战入口，不替代理论篇的基础循环。
+- 文档站用 VitePress（配置在 `.vitepress/`），只是现有 Markdown 的阅读界面：各目录 `README.md` 仍是唯一内容源，不要为网站另写一份内容。新增章节或实战时，同步更新 `.vitepress/config.mts` 的 `sidebar`。
 - Lab 01 是实战主干；后续实战统一写成 `labs/NN-name/extension.py` 里的 `Extension` 子类（挂载点只有 `tools`、`system_prompt`、`on_stop`），通过 `server.py --lab NN` 或 `--ext name` 挂上；自带练习目录写在 `DEMO`，页面示例写在 `SAMPLES`。不修改 Lab 01 的 Agent Loop，也不单独做界面。
 
 ## Git 约定

@@ -9,3 +9,6 @@ __pycache__/
 .scheduled_tasks.json
 .workflow-runtime/
 .coding-agent-sessions/
+node_modules/
+.vitepress/cache/
+.vitepress/dist/

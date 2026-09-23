@@ -1,0 +1,150 @@
+import path from 'node:path'
+import { defineConfig } from 'vitepress'
+
+const REPO = 'https://github.com/lance2016/ai-is-simple'
+const ROOT = path.resolve(__dirname, '..')
+
+// Markdown files that live in the repo but are not course pages.
+const NOT_PAGES = ['Agents.md', 'STYLE_GUIDE.md', 'SOURCES.md']
+
+// Relative links to code files or non-page docs have no page on the site,
+// so point them at GitHub instead of producing dead links.
+function githubLinks(md) {
+  md.core.ruler.push('github_links', (state) => {
+    const fromDir = path.dirname(path.relative(ROOT, state.env.path))
+    for (const block of state.tokens) {
+      for (const token of block.children ?? []) {
+        if (token.type !== 'link_open') continue
+        const href = token.attrGet('href')
+        if (!href || /^([a-z]+:|#|\/)/i.test(href)) continue
+        const target = path.posix.join(fromDir, href.split('#')[0])
+        const ext = path.extname(target)
+        const isPage = ext === '' || (ext === '.md' && !NOT_PAGES.includes(target))
+        if (!isPage) token.attrSet('href', `${REPO}/blob/main/${target}`)
+      }
+    }
+  })
+}
+
+export default defineConfig({
+  lang: 'zh-CN',
+  title: 'AI 如此简单',
+  description: '一张图 + 一句话 + 一小段代码，把一个 AI Agent 概念讲明白',
+  base: '/ai-is-simple/',
+
+  // The README files stay the single source of content; they only get
+  // renamed to index pages. Root README becomes the intro page because the
+  // site home is index.md.
+  rewrites: {
+    'README.md': 'intro.md',
+    'chapters/:dir/README.md': 'chapters/:dir/index.md',
+    'labs/:dir/README.md': 'labs/:dir/index.md',
+  },
+  srcExclude: [
+    ...NOT_PAGES,
+    '**/skills/**',
+    '**/demo/**',
+    '**/notes/**',
+    '.venv/**',
+  ],
+
+  markdown: {
+    config: githubLinks,
+    languageAlias: { env: 'dotenv' },
+  },
+
+  themeConfig: {
+    nav: [
+      { text: '项目介绍', link: '/intro' },
+      { text: '理论篇', link: '/chapters/00-chat-completion/' },
+      { text: '实战篇', link: '/labs/01-mini-coding-agent/' },
+    ],
+
+    sidebar: [
+      {
+        text: '开始',
+        items: [
+          { text: '项目介绍', link: '/intro' },
+          { text: '学习路线', link: '/intro#学习路线' },
+        ],
+      },
+      {
+        text: '基础核心',
+        items: [
+          { text: '00 · Chat Completion', link: '/chapters/00-chat-completion/' },
+          { text: '01 · Agent Loop', link: '/chapters/01-agent-loop/' },
+          { text: '02 · Tool Use', link: '/chapters/02-tool-use/' },
+          { text: '03 · Permission', link: '/chapters/03-permission/' },
+        ],
+      },
+      {
+        text: '能力扩展',
+        items: [
+          { text: '04 · Hooks', link: '/chapters/04-hooks/' },
+          { text: '05 · Planning', link: '/chapters/05-planning/' },
+          { text: '06 · Subagents', link: '/chapters/06-subagents/' },
+          { text: '07 · Skills', link: '/chapters/07-skill-loading/' },
+          { text: '08 · Context', link: '/chapters/08-context-compact/' },
+          { text: '09 · Memory', link: '/chapters/09-memory/' },
+        ],
+      },
+      {
+        text: '运行与协作',
+        items: [
+          { text: '10 · Tasks', link: '/chapters/10-tasks/' },
+          { text: '11 · Background Tasks', link: '/chapters/11-background-tasks/' },
+          { text: '12 · Cron', link: '/chapters/12-cron-scheduler/' },
+          { text: '13 · Agent Teams', link: '/chapters/13-agent-teams/' },
+          { text: '14 · MCP', link: '/chapters/14-mcp-plugin/' },
+        ],
+      },
+      {
+        text: '工程化',
+        items: [
+          { text: '15 · Agent Harness', link: '/chapters/15-integrated-harness/' },
+          { text: '16 · Workflow Runtime', link: '/chapters/16-workflow-runtime/' },
+          { text: '17 · Goal Loop', link: '/chapters/17-goal-loop/' },
+        ],
+      },
+      {
+        text: '实战',
+        items: [
+          { text: 'Lab 01 · Mini Coding Agent', link: '/labs/01-mini-coding-agent/' },
+          { text: 'Lab 02 · 记住项目', link: '/labs/02-memory/' },
+          { text: 'Lab 03 · 交给子 Agent', link: '/labs/03-subagent/' },
+          { text: 'Lab 04 · 接真实 MCP', link: '/labs/04-mcp/' },
+          { text: 'Lab 05 · 修到测试通过', link: '/labs/05-verify/' },
+        ],
+      },
+    ],
+
+    outline: { level: [2, 3], label: '本页目录' },
+    docFooter: { prev: '上一章', next: '下一章' },
+    socialLinks: [{ icon: 'github', link: REPO }],
+    editLink: {
+      pattern: `${REPO}/edit/main/:path`,
+      text: '在 GitHub 上修改此页',
+    },
+
+    search: {
+      provider: 'local',
+      options: {
+        translations: {
+          button: { buttonText: '搜索', buttonAriaLabel: '搜索' },
+          modal: {
+            noResultsText: '没有找到结果',
+            resetButtonTitle: '清空',
+            footer: { selectText: '选择', navigateText: '切换', closeText: '关闭' },
+          },
+        },
+      },
+    },
+
+    darkModeSwitchLabel: '外观',
+    lightModeSwitchTitle: '切换到浅色',
+    darkModeSwitchTitle: '切换到深色',
+    sidebarMenuLabel: '目录',
+    returnToTopLabel: '回到顶部',
+    notFound: { title: '页面不存在', quote: '这一页还没写。', linkText: '回到首页' },
+  },
+})

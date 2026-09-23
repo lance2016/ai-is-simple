@@ -213,6 +213,17 @@ python labs/01-mini-coding-agent/server.py
 
 然后打开 <http://127.0.0.1:8765>，在输入框里试试：「看看 labs 目录里有什么，读一下里面的 README」。
 
+### 5. 本地打开文档站（可选）
+
+课程也可以在网站上连续阅读：<https://lance2016.github.io/ai-is-simple/>。想在本地预览：
+
+```bash
+npm install
+npm run docs:dev
+```
+
+网站只是这些 Markdown 的阅读界面，内容仍以各目录的 `README.md` 为准。
+
 ---
 
 ## 每章都长什么样？
