@@ -28,6 +28,10 @@ let live = null;         // 模型正在流式输出的那段文字
 let spinner = null;      // "思考中" 提示，模型一有产出就撤掉
 let lastTask = "";       // 最近一次发出的任务，出错后可以一键重发
 
+// 流式片段最多每 50ms 重绘一次。不用 requestAnimationFrame：
+// 窗口被挡住、切到别的标签页时浏览器会暂停它，文字就会憋到最后一次性出现。
+const REPAINT_MS = 50;
+
 /* ── 放置与滚动 ─────────────────────────────────── */
 
 function atBottom() {
@@ -69,13 +73,13 @@ function onDelta(e) {
     item.append(live.node);
   }
   live.text += e.content;
-  // 片段来得很密，攒到下一帧再统一渲染一次 Markdown
+  // 片段来得很密，攒一小会儿再统一渲染一次 Markdown
   if (!live.frame) {
     const target = live;
-    target.frame = requestAnimationFrame(() => {
+    target.frame = setTimeout(() => {
       target.frame = 0;
       follow(() => renderMarkdown(target.node, target.text, false));
-    });
+    }, REPAINT_MS);
   }
 }
 
@@ -84,7 +88,7 @@ function onSay(e) {
   if (!e.content) return;
   let node;
   if (live) {
-    cancelAnimationFrame(live.frame);
+    clearTimeout(live.frame);
     node = live.node;
   } else {
     node = el("div", "md");
