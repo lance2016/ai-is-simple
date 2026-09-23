@@ -8,6 +8,7 @@
     "docs:preview": "vitepress preview"
   },
   "devDependencies": {
+    "lxgw-wenkai-webfont": "^1.7.0",
     "medium-zoom": "^1.1.0",
     "vitepress": "^1.6.4"
   }

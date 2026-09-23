@@ -2,6 +2,7 @@ import DefaultTheme from 'vitepress/theme'
 import mediumZoom from 'medium-zoom'
 import { nextTick, onMounted, watch } from 'vue'
 import { useRoute } from 'vitepress'
+import 'lxgw-wenkai-webfont/lxgwwenkai-bold.css'
 import './style.css'
 
 export default {

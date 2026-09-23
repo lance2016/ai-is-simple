@@ -11,6 +11,8 @@ const NOT_PAGES = ['Agents.md', 'STYLE_GUIDE.md', 'SOURCES.md']
 // so point them at GitHub instead of producing dead links.
 function githubLinks(md) {
   md.core.ruler.push('github_links', (state) => {
+    // Some renders (e.g. page titles) carry no file path; nothing to rewrite there.
+    if (!state.env.path) return
     const fromDir = path.dirname(path.relative(ROOT, state.env.path))
     for (const block of state.tokens) {
       for (const token of block.children ?? []) {
@@ -54,31 +56,23 @@ export default defineConfig({
   },
 
   themeConfig: {
-    nav: [
-      { text: '项目介绍', link: '/intro' },
-      { text: '理论篇', link: '/chapters/00-chat-completion/' },
-      { text: '实战篇', link: '/labs/01-mini-coding-agent/' },
-    ],
-
+    // No top nav: the sidebar is the only course navigation.
+    // Order follows the README reading advice: main line first (00-03, 15),
+    // so prev/next walks readers through it before the optional chapters.
     sidebar: [
+      { text: '项目介绍', link: '/intro' },
       {
-        text: '开始',
-        items: [
-          { text: '项目介绍', link: '/intro' },
-          { text: '学习路线', link: '/intro#学习路线' },
-        ],
-      },
-      {
-        text: '基础核心',
+        text: '主线课程',
         items: [
           { text: '00 · Chat Completion', link: '/chapters/00-chat-completion/' },
           { text: '01 · Agent Loop', link: '/chapters/01-agent-loop/' },
           { text: '02 · Tool Use', link: '/chapters/02-tool-use/' },
           { text: '03 · Permission', link: '/chapters/03-permission/' },
+          { text: '15 · Agent Harness', link: '/chapters/15-integrated-harness/' },
         ],
       },
       {
-        text: '能力扩展',
+        text: '按需能力',
         items: [
           { text: '04 · Hooks', link: '/chapters/04-hooks/' },
           { text: '05 · Planning', link: '/chapters/05-planning/' },
@@ -86,22 +80,11 @@ export default defineConfig({
           { text: '07 · Skills', link: '/chapters/07-skill-loading/' },
           { text: '08 · Context', link: '/chapters/08-context-compact/' },
           { text: '09 · Memory', link: '/chapters/09-memory/' },
-        ],
-      },
-      {
-        text: '运行与协作',
-        items: [
           { text: '10 · Tasks', link: '/chapters/10-tasks/' },
           { text: '11 · Background Tasks', link: '/chapters/11-background-tasks/' },
           { text: '12 · Cron', link: '/chapters/12-cron-scheduler/' },
           { text: '13 · Agent Teams', link: '/chapters/13-agent-teams/' },
           { text: '14 · MCP', link: '/chapters/14-mcp-plugin/' },
-        ],
-      },
-      {
-        text: '工程化',
-        items: [
-          { text: '15 · Agent Harness', link: '/chapters/15-integrated-harness/' },
           { text: '16 · Workflow Runtime', link: '/chapters/16-workflow-runtime/' },
           { text: '17 · Goal Loop', link: '/chapters/17-goal-loop/' },
         ],
