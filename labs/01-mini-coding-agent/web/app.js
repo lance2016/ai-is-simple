@@ -270,7 +270,8 @@ function showHint(error) {
   else hint.textContent = "Enter 发送，Shift + Enter 换行";
 }
 
-const SAMPLES = [
+// 没挂扩展时用这两条；用 --lab 启动时，换成那个实战自带的示例
+let samples = [
   "看看 labs 目录里有什么，读一下里面的 README",
   "agent.py 里定义了哪几个工具？各自要不要授权？",
 ];
@@ -280,7 +281,7 @@ function showBlank() {
   box.append(el("h2", "", "还没有任务"));
   box.append(el("p", "", "每次工具调用会折叠成两行：调用了什么、结果如何。点开能看到参数和完整返回。会改动文件的步骤会自动展开，等你点头。"));
   const list = el("div", "try");
-  SAMPLES.forEach((text) => {
+  samples.forEach((text) => {
     const b = el("button", "", text);
     b.type = "button";
     b.onclick = () => { input.value = text; resize(); input.focus(); };
@@ -297,7 +298,13 @@ const HANDLERS = {
     // 路径太长时只留尾部两段，那才是分得清项目的部分
     const parts = e.workspace.split("/").filter(Boolean);
     rootPath.textContent = parts.length > 2 ? "…/" + parts.slice(-2).join("/") : e.workspace;
+    if (e.extensions?.length) rootPath.textContent += ` · ${e.extensions.join(" + ")}`;
     rootPath.title = e.workspace;
+    if (e.samples?.length) {
+      samples = e.samples;
+      // 空状态已经按默认示例画好了，换成这个实战的示例再画一遍
+      if (feed.querySelector(".blank")) { feed.querySelector(".blank").remove(); showBlank(); }
+    }
   },
   user_message: (e) => { live = null; lastTask = e.content; openTurn(e.content); },
   thinking: (e) => showSpinner("思考中…", e.time),
@@ -310,6 +317,8 @@ const HANDLERS = {
   permission_result: onAskDone,
   error: onFail,
   stopped: onStopped,
+  // 扩展想对你说的话，比如验收结果，不属于模型的回复
+  note: (e) => place(el("div", "item note", e.content)),
   busy: () => setBusy(true),
   idle: () => setBusy(false),
   reset,

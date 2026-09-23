@@ -68,6 +68,9 @@ python labs/01-mini-coding-agent/server.py
 python labs/01-mini-coding-agent/server.py --workspace ~/some-project
 ```
 
+<details>
+<summary>界面怎么用（选读）</summary>
+
 界面参考了 Claude Code 的样子：模型的回复按 Markdown 渲染，边生成边显示；每次工具调用默认折叠成两行，例如：
 
 ```text
@@ -88,6 +91,8 @@ python labs/01-mini-coding-agent/server.py --workspace ~/some-project
 - 代码和命令输出都有「复制」按钮，复制 `read` 的结果时会自动去掉行号；
 - 「新对话」只清空上下文，已经改动的文件不会回滚。
 
+</details>
+
 网页只负责看和点。真正的路径检查、命令判断、权限判断都在 Python 里；关掉网页或者拒绝授权，模型没有别的路可以绕过去。
 
 ## 代码结构
@@ -95,8 +100,8 @@ python labs/01-mini-coding-agent/server.py --workspace ~/some-project
 两个 Python 文件，加上一个不需要构建的前端：
 
 ```text
-agent.py           Agent 内核：工具定义、工作区边界、模型循环
-server.py          网页界面：HTTP 接口 + SSE 事件流 + 授权开关
+agent.py           Agent 内核：工具定义、工作区边界、模型循环、扩展接口
+server.py          网页界面：HTTP 接口 + SSE 事件流 + 授权开关 + 加载扩展
 web/index.html     页面骨架
 web/app.js         前端核心：连事件流、按事件更新页面、发送输入和授权
 web/render.js      渲染：Markdown、代码高亮、工具摘要和详情视图
@@ -153,7 +158,7 @@ for _ in range(MAX_TURNS):
         self._handle_tool_call(call)
 ```
 
-就这么点东西。循环的出口只有一个：模型这一轮没有请求工具。
+就这么点东西。循环的出口只有一个：模型这一轮没有请求工具。（挂了扩展以后，扩展可以在这个出口前再插一句话，见下面“怎么加能力”。）
 
 ### 为什么要流式
 
@@ -171,6 +176,42 @@ Agent 跑在后台线程。它调 `confirm(...)` 时，`PermissionGate` 做三�
 
 页面这边用 SSE 收事件。每条事件都有编号，所以刷新页面或者断线重连，带上上次的编号就能接着读，不丢也不重。
 
+## 怎么加能力：Extension
+
+后面几个实战都不改这个文件的循环，而是写一个 `Extension` 子类挂上来。它只有三个挂载点：
+
+```python
+class Extension:
+    tools = ()                            # 多给模型几个工具
+    def system_prompt(self, workspace):   # 往 system prompt 里补一段话
+        return ""
+    def on_stop(self, agent):             # 模型想结束时插一句话；返回文字，循环就继续
+        return None
+```
+
+每个实战目录里放一个 `extension.py`，提供 `create(workspace)`。想看哪个实战，一条命令启动：
+
+```bash
+python labs/01-mini-coding-agent/server.py --lab 05
+```
+
+`--lab 05` 会挂上 `labs/05-verify/` 的扩展。如果那个实战在 `DEMO` 里写了自带的练习目录，工作区也会自动切过去；页面空白时显示它在 `SAMPLES` 里写的示例任务。
+
+想自由组合，就用 `--ext`，可以写多次，按目录名后半截匹配（`--ext memory` 找 `labs/NN-memory/`）：
+
+```bash
+python labs/01-mini-coding-agent/server.py --lab 05 --ext subagent
+```
+
+| 实战 | 扩展 | 用到的挂载点 | 对应理论篇 |
+|---|---|---|---|
+| [02 · 记住项目](../02-memory/) | `memory` | `system_prompt` | 07 Skill Loading、09 Memory |
+| [03 · 交给子 Agent](../03-subagent/) | `subagent` | `tools` | 06 Subagents |
+| [04 · 接真实 MCP](../04-mcp/) | `mcp` | `tools`、`system_prompt` | 14 MCP、03 Permission |
+| [05 · 修到测试通过](../05-verify/) | `verify` | `system_prompt`、`on_stop` | 17 Goal Loop、04 Hooks |
+
+挂载点刻意只有三个。权限不单独做挂载点，仍然由每个工具自己的 `confirm_prompt` 决定。扩展加进来的工具，走的也是 `_execute()` 这个唯一入口和同一套授权。
+
 ## 对应理论篇
 
 | 理论篇 | 实战代码 |
@@ -178,9 +219,10 @@ Agent 跑在后台线程。它调 `confirm(...)` 时，`PermissionGate` 做三�
 | Agent Loop | `CodingAgent.run()` |
 | Tool Use | `Tool` 基类和它的四个子类 |
 | Permission | `Workspace.resolve()`、`Tool.confirm_prompt()`、`PermissionGate` |
-| Hooks 思路 | `CodingAgent._execute()`，所有工具的唯一入口 |
-| Context | `CodingAgent.messages` |
+| Hooks | `Extension` 的三个挂载点。`on_stop` 就是第 04 章的 `Stop` 节点 |
 | Harness | `CodingAgent + Workspace + AgentSession` |
+
+上下文只是 `CodingAgent.messages` 这个列表，本实战没有做压缩（第 08 章）。
 
 最值得注意的一点：模型从头到尾没有直接读过文件，也没有直接执行过命令。它只能提出 Tool Call，真正动手的是 `Tool.run()`，而动手之前还要过 `Workspace` 和授权这两关。
 
@@ -214,3 +256,12 @@ Agent 跑在后台线程。它调 `confirm(...)` 时，`PermissionGate` 做三�
 ## 想一想
 
 如果要加一个 `delete_file` 工具，你会把授权写在哪里？如果只在 system prompt 里写「删文件前要先问用户」，而不写进程序，会有什么风险？
+
+<details>
+<summary>参考思路（先自己想一想，再展开）</summary>
+
+授权写在 `DeleteTool.confirm_prompt()` 里：返回一句“删除文件 xxx”，`_execute()` 就会先弹窗，拿到允许才调用 `run()`。路径检查照样交给 `Workspace.resolve()`。
+
+只写在 system prompt 里，等于把安全交给模型的自觉。模型可能忘记、可能被文件里的内容误导，也可能觉得“这个文件显然没用”就直接删了。程序里的检查不会被说服。
+
+</details>

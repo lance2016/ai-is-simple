@@ -33,9 +33,7 @@
 4. **一小段代码**：真正跑起来；
 5. **使用边界**：知道什么时候值得用、什么时候反而会增加复杂度。
 
-最终你会从一次普通 Chat Completion 和一个最小循环开始，逐渐理解：
-
-**Chat Completion → Agent Loop → Tool Use → Permission → Planning → Subagents → Skills → Context → Memory → Tasks → MCP → Agent Teams → Harness → Workflow**
+你会从一次普通 Chat Completion 和一个最小循环开始，先搭起 Agent 的主干，再按需要认识 Planning、Subagents、Memory、MCP、Workflow 等可选能力。
 
 ---
 
@@ -43,23 +41,30 @@
 
 <img src="./assets/learning-roadmap.png" alt="AI Agent 学习路线" width="100%" />
 
-学习主线可以先记成：
+18 章不是一条必须走完的直线，而是**一条主干 + 一组按场景选用的能力**：
 
 ```text
-Chat Completion
-      ↓
-Agent Loop
-      ↓
-Tool Use
-      ↓
-Permission
-      ↓
-Planning / Subagents / Memory / MCP ...
+【核心主干】每个 Agent 都有
+
+  00 Chat Completion → 01 Agent Loop → 02 Tool Use → 03 Permission
+                                  ↓
+                   15 Harness：把用到的能力组织起来
+
+【可选能力】遇到对应问题，再挂到主干上
+
+  循环里的逻辑越来越多  →  04 Hooks
+  任务步骤多、容易走偏  →  05 Planning / 10 Tasks / 17 Goal Loop
+  上下文不够用          →  06 Subagents / 07 Skills / 08 Compact
+  下次还要记得          →  09 Memory
+  慢任务、定时任务      →  11 Background / 12 Cron
+  需要多个 Agent 分工   →  13 Agent Teams
+  要接外部服务          →  14 MCP
+  流程已经固定          →  16 Workflow
 ```
 
-可以把一个成熟 Agent 想成不断升级的小助手：
-
-> **会思考 → 会使用工具 → 会规划 → 会记忆 → 会协作 → 会长期运行**
+- **主干**：建议按顺序读完 00～03，再读 15。有了这几章，就能看懂一个最小但完整的 Agent。
+- **可选能力**：遇到对应问题时再读，不必全部具备。一个好用的 Agent 往往只用了其中两三种。
+- 每章开头的 **“本章新增”** 会说明它在基础循环上多了什么，方便跳着读。
 
 所有复杂 Agent，最后都建立在同一个最小循环上：
 
@@ -110,16 +115,30 @@ Planning / Subagents / Memory / MCP ...
 | ✅ | [17 · Goal Loop](./chapters/17-goal-loop/) | 目标循环 | 目标决定 Agent 什么时候真正结束 |
 
 > 不需要一次理解全部概念。  
-> **按顺序学习可以建立主线；代码示例仍然可以单章运行，不要求逐章拼装。**
+> **先读主干（00～03、15），其余章节按需要挑着读；代码示例都可以单章运行，不要求逐章拼装。**
 
 ## 第二部分：实战篇
 
-理论篇讲清“零件是什么”，实战篇把零件装回一个小型 Coding Agent：
+理论篇讲清“零件是什么”，实战篇把零件装回一个小型 Coding Agent。
 
-| 状态 | 实战 | 核心内容 |
-| --- | --- | --- |
-| ✅ | [01 · Mini Coding Agent](./labs/01-mini-coding-agent/) | 用 Python + DeepSeek 实现 `read / write / edit / bash` 四个工具，配一个网页界面：流式输出、逐步展示 tool call、改动前等你授权 |
-| 📖 | Pi 扩展阅读 | 理解 TypeScript/Node.js Harness 如何通过 Extension、Skill、Session 和 SDK 扩展 |
+实战篇和理论篇一样，也是 **主干 + 按需挂上的能力**：Lab 01 是主干；后面每个实战只写一个扩展文件，挂到同一个 Agent 上，Agent Loop 一行不改。
+
+| 状态 | 实战 | 核心内容 | 对应理论篇 |
+| --- | --- | --- | --- |
+| ✅ | [01 · Mini Coding Agent](./labs/01-mini-coding-agent/) | 用 Python + DeepSeek 实现 `read / write / edit / bash` 四个工具，配一个网页界面：流式输出、逐步展示 tool call、改动前等你授权；留好三个扩展挂载点 | 01～04、15 |
+| ✅ | [02 · 记住项目](./labs/02-memory/) | `.agent/MEMORY.md` 每次带进 system prompt，技能只放目录、用到再读；不加新工具 | 07、09 |
+| ✅ | [03 · 交给子 Agent](./labs/03-subagent/) | `task` 工具背后是另一个只读的 `CodingAgent`，只交回总结 | 06 |
+| ✅ | [04 · 接真实 MCP](./labs/04-mcp/) | 手写 stdio MCP Server 和客户端，远程工具和本地工具走同一套授权 | 14、03 |
+| ✅ | [05 · 修到测试通过](./labs/05-verify/) | 模型想结束时由程序跑测试，没过就把失败输出送回循环 | 17、04 |
+| 📖 | Pi 扩展阅读 | 理解 TypeScript/Node.js Harness 如何通过 Extension、Skill、Session 和 SDK 扩展 | — |
+
+想看哪个实战，一条命令启动，页面上会列出这个实战的示例任务，点一下就能用：
+
+```bash
+python labs/01-mini-coding-agent/server.py --lab 05   # 换成 02 / 03 / 04 / 05
+```
+
+想同时挂多个能力，再加 `--ext`，例如 `--lab 05 --ext subagent`。
 
 实战篇不会复制 Pi 的代码，而是参考它的设计理念，先让读者拥有一个自己能读懂、能修改、能运行的最小版本，再理解更完整的工程实现。
 
@@ -201,7 +220,7 @@ python labs/01-mini-coding-agent/server.py
 ```text
 主图
  ↓
-一句话总结
+一句话总结 + 本章新增了什么
  ↓
 生活化解释
  ↓
@@ -209,7 +228,7 @@ python labs/01-mini-coding-agent/server.py
  ↓
 今天只记住
  ↓
-一个思考题
+一个思考题（附折叠的参考思路）
 ```
 
 项目刻意避免两件事：
@@ -312,11 +331,15 @@ ai-is-simple/
 │       ├── README.md
 │       └── code.py
 └── labs/
-    └── 01-mini-coding-agent/
-        ├── README.md
-        ├── agent.py      # Agent 内核
-        ├── server.py     # 网页界面的后端
-        └── web/          # 前端页面
+    ├── 01-mini-coding-agent/
+    │   ├── README.md
+    │   ├── agent.py      # Agent 内核 + 扩展接口
+    │   ├── server.py     # 网页界面的后端，--lab / --ext 加载扩展
+    │   └── web/          # 前端页面
+    ├── 02-memory/        # 每个实战：extension.py + README.md，需要时带一个 demo/
+    ├── 03-subagent/
+    ├── 04-mcp/           # 另有 notes_server.py 和 notes/
+    └── 05-verify/
 ```
 
 每个章节都是一个独立的小单元：

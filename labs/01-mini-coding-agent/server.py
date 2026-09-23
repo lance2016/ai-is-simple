@@ -13,6 +13,7 @@
 from __future__ import annotations
 
 import argparse
+import importlib.util
 import json
 import threading
 import time
@@ -22,9 +23,10 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
-from agent import CodingAgent, Workspace
+from agent import CodingAgent, Extension, Workspace
 
 WEB_DIR = Path(__file__).resolve().parent / "web"
+LABS_DIR = Path(__file__).resolve().parents[1]
 # 前端只有这几个文件，写死成白名单，URL 里再怎么拼路径也拿不到别的东西。
 STATIC_FILES = {
     "/": ("index.html", "text/html; charset=utf-8"),
@@ -108,14 +110,23 @@ class PermissionGate:
 class AgentSession:
     """一次浏览器会话：一个 Agent、一条事件流、一个授权开关。"""
 
-    def __init__(self, workspace: Workspace):
+    def __init__(
+        self, workspace: Workspace, extensions: tuple[Extension, ...] = (), samples: tuple[str, ...] = ()
+    ):
         self.events = EventLog()
         self.gate = PermissionGate(self.events)
-        self.agent = CodingAgent(workspace, confirm=self.gate.ask, emit=self.events.publish)
+        self.agent = CodingAgent(
+            workspace, confirm=self.gate.ask, emit=self.events.publish, extensions=extensions
+        )
         self._lock = threading.Lock()
         self._running = False
-        # 第一条事件带上工作区路径，页面一连上就知道自己在操作哪个目录。
-        self.events.publish({"type": "ready", "workspace": str(workspace.root)})
+        # 第一条事件带上工作区路径、挂了哪些扩展、有哪些示例任务，页面一连上就知道自己在哪个实战里。
+        self.events.publish({
+            "type": "ready",
+            "workspace": str(workspace.root),
+            "extensions": [extension.name for extension in extensions],
+            "samples": list(samples),
+        })
 
     def submit(self, prompt: str) -> bool:
         """同一时间只跑一个任务。任务放到后台线程，HTTP 请求立刻返回。"""
@@ -269,22 +280,60 @@ class AgentServer(ThreadingHTTPServer):
         self.session = session
 
 
+def find_extension(pattern: str, hint: str) -> Path:
+    """--ext verify 找 labs/NN-verify/，--lab 05 找 labs/05-xxx/，两种写法指向同一个 extension.py。"""
+    matches = sorted(LABS_DIR.glob(f"{pattern}/extension.py"))
+    if not matches:
+        raise SystemExit(f"找不到{hint}：labs/ 下没有 {pattern}/extension.py。")
+    return matches[0]
+
+
+def load_module(path: Path):
+    spec = importlib.util.spec_from_file_location(f"ext_{path.parent.name.replace('-', '_')}", path)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
 def main() -> None:
     project_root = Path(__file__).resolve().parents[2]
     parser = argparse.ArgumentParser(description="带网页界面的最小 Coding Agent")
-    parser.add_argument("--workspace", type=Path, default=project_root, help="Agent 能操作的目录，默认是本项目根目录")
+    parser.add_argument(
+        "--lab", metavar="NN",
+        help="直接启动某个实战，例如 --lab 05：自动挂上它的扩展，并切到它自带的 demo 目录",
+    )
+    parser.add_argument("--workspace", type=Path, help="Agent 能操作的目录，默认是本项目根目录，或 --lab 的 demo 目录")
     parser.add_argument("--host", default="127.0.0.1", help="监听地址，默认只允许本机访问")
     parser.add_argument("--port", type=int, default=8765, help="监听端口，默认 8765")
+    parser.add_argument(
+        "--ext", action="append", default=[], metavar="NAME",
+        help="挂上一个扩展，可以写多次，例如 --ext memory --ext verify",
+    )
     args = parser.parse_args()
 
-    root = args.workspace.expanduser().resolve()
+    # Lab 01 就是主干本身，--lab 01 等于什么扩展都不挂。
+    lab = None if args.lab in (None, "01") else args.lab
+    paths = [find_extension(f"{lab}-*", f"实战 {lab}")] if lab else []
+    paths += [find_extension(f"[0-9][0-9]-{name}", f"扩展 {name}") for name in args.ext]
+    modules = [load_module(path) for path in dict.fromkeys(paths)]
+
+    # 工作区优先听 --workspace；没写的话，--lab 的实战自带 demo 就用它的 demo。
+    default_root = project_root
+    if lab and getattr(modules[0], "DEMO", None):
+        default_root = paths[0].parent / modules[0].DEMO
+    root = (args.workspace or default_root).expanduser().resolve()
     if not root.is_dir():
         raise SystemExit(f"工作区不存在：{root}")
 
-    session = AgentSession(Workspace(root))
+    workspace = Workspace(root)
+    extensions = tuple(module.create(workspace) for module in modules)
+    samples = tuple(sample for module in modules for sample in getattr(module, "SAMPLES", ()))
+    session = AgentSession(workspace, extensions, samples)
     server = AgentServer((args.host, args.port), session)
     print(f"Agent 已启动：http://{args.host}:{args.port}")
     print(f"工作区：{root}")
+    if extensions:
+        print(f"扩展：{', '.join(extension.name for extension in extensions)}")
     try:
         server.serve_forever()
     except KeyboardInterrupt:

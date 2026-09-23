@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
 """实战篇 01：一个最小但完整的 Coding Agent 内核。
 
-这个文件只关心三件事：
+这个文件只关心四件事：
   1. 工具长什么样（Tool 及其四个子类）
   2. 工具能碰哪些文件（Workspace）
   3. 模型和工具怎么来回交替（CodingAgent.run）
+  4. 以后怎么加能力而不改循环（Extension）
 
 界面在 server.py 里，两边只靠两个回调连接：
   confirm(action) -> bool   需要授权时问用户
@@ -246,6 +247,25 @@ class BashTool(Tool):
 
 TOOLS: dict[str, Tool] = {tool.name: tool for tool in (ReadTool(), WriteTool(), EditTool(), BashTool())}
 
+class Extension:
+    """给 Agent 加能力的唯一入口，后面几个实战都是它的子类。
+
+    只留三个挂载点，够用就不再加：
+      tools          多给模型几个工具
+      system_prompt  往系统提示里补一段话
+      on_stop        模型想结束时插一句话；返回文字就把它当成新消息，循环继续
+    """
+
+    name: str = ""
+    tools: tuple[Tool, ...] = ()
+
+    def system_prompt(self, workspace: Workspace) -> str:
+        return ""
+
+    def on_stop(self, agent: CodingAgent) -> str | None:
+        return None
+
+
 SYSTEM_PROMPT = """你是一个谨慎、简洁的中文 Coding Agent。
 
 当前工作区：{workspace}
@@ -266,17 +286,28 @@ class CodingAgent:
         confirm: Callable[[str], bool],
         emit: Callable[[dict], None],
         client: OpenAI | None = None,
+        extensions: tuple[Extension, ...] = (),
     ):
         self.workspace = workspace
         self.confirm = confirm
         self.emit = emit
         self.client = client or create_client()
+        self.extensions = tuple(extensions)
+        self.tools = dict(TOOLS)
+        for extension in self.extensions:
+            for tool in extension.tools:
+                # 同名会悄悄覆盖掉原来的工具，宁可启动时就报错。
+                if tool.name in self.tools:
+                    raise ValueError(f"工具名 {tool.name} 重复了（来自扩展 {extension.name}）。")
+                self.tools[tool.name] = tool
         self.messages: list[dict] = [self._system_message()]
         # 用户随时可能喊停。停止只在"安全的缝隙"里生效：收流的间隙、每个工具执行之前。
         self._stop = threading.Event()
 
     def _system_message(self) -> dict:
-        return {"role": "system", "content": SYSTEM_PROMPT.format(workspace=self.workspace.root)}
+        parts = [SYSTEM_PROMPT.format(workspace=self.workspace.root)]
+        parts += [extension.system_prompt(self.workspace) for extension in self.extensions]
+        return {"role": "system", "content": "\n\n".join(part for part in parts if part)}
 
     def reset(self) -> None:
         """只清空上下文。工作区里已经改过的文件不会回滚。"""
@@ -305,9 +336,13 @@ class CodingAgent:
             self.messages.append(message)
             if message["content"]:
                 self.emit({"type": "assistant_message", "content": message["content"]})
-            # 模型这一轮没要工具，说明它认为信息够了，任务到此结束。
+            # 模型这一轮没要工具，说明它认为信息够了。扩展没有意见，任务就到此结束。
             if not message.get("tool_calls"):
-                return
+                follow_up = self._ask_extensions_before_stop()
+                if follow_up is None:
+                    return
+                self.messages.append({"role": "user", "content": follow_up})
+                continue
             for call in message["tool_calls"]:
                 self._handle_tool_call(call)
             if self._stop.is_set():
@@ -315,6 +350,14 @@ class CodingAgent:
                 return
 
         self.emit({"type": "assistant_message", "content": f"连续执行了 {MAX_TURNS} 轮还没结束，先停下来等你确认。"})
+
+    def _ask_extensions_before_stop(self) -> str | None:
+        """模型想停时，挨个问扩展。第一个开口的扩展说了算。"""
+        for extension in self.extensions:
+            follow_up = extension.on_stop(self)
+            if follow_up:
+                return follow_up
+        return None
 
     def _ask_model(self) -> dict:
         """流式请求模型：文字边生成边推给界面，最后拼回一条完整的 assistant 消息。
@@ -326,7 +369,7 @@ class CodingAgent:
         stream = self.client.chat.completions.create(
             model=MODEL,
             messages=self.messages,
-            tools=[tool.schema() for tool in TOOLS.values()],
+            tools=[tool.schema() for tool in self.tools.values()],
             tool_choice="auto",
             stream=True,
         )
@@ -397,7 +440,7 @@ class CodingAgent:
         # 同一轮里排在后面的工具，停止之后也要给一个结果，保证每个 tool call 都有回应。
         if self._stop.is_set():
             return "Blocked: 任务已停止。"
-        tool = TOOLS.get(name)
+        tool = self.tools.get(name)
         if tool is None:
             return f"Error: 没有名为 {name} 的工具。"
         try:

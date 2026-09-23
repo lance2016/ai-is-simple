@@ -104,7 +104,8 @@ const DISPLAY = { bash: "Bash", read: "Read", write: "Write", edit: "Edit" };
 
 // 折叠状态下的第一行：工具名 + 最关键的那个参数，例如 Bash ls labs、Read agent.py
 export function toolTitle(name, args) {
-  const arg = name === "bash" ? args.command : args.path;
+  // 扩展加进来的工具不认识，就拿第一个文字参数当摘要
+  const arg = name === "bash" ? args.command : name in DISPLAY ? args.path : Object.values(args).find((v) => typeof v === "string");
   return { name: DISPLAY[name] || name, arg: arg ? String(arg).split("\n")[0] : "" };
 }
 
