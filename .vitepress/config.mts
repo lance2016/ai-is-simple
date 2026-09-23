@@ -96,6 +96,7 @@ export default defineConfig({
           { text: 'Lab 03 · 交给子 Agent', link: '/labs/03-subagent/' },
           { text: 'Lab 04 · 接真实 MCP', link: '/labs/04-mcp/' },
           { text: 'Lab 05 · 修到测试通过', link: '/labs/05-verify/' },
+          { text: 'Lab 06 · 看见 Agent 的运行轨迹', link: '/labs/06-observability/' },
         ],
       },
     ],

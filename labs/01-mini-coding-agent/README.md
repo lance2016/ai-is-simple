@@ -97,11 +97,12 @@ python labs/01-mini-coding-agent/server.py --workspace ~/some-project
 
 ## 代码结构
 
-两个 Python 文件，加上一个不需要构建的前端：
+三个 Python 文件，加上一个不需要构建的前端：
 
 ```text
 agent.py           Agent 内核：工具定义、工作区边界、模型循环、扩展接口
 server.py          网页界面：HTTP 接口 + SSE 事件流 + 授权开关 + 加载扩展
+observability.py   可选追踪桥：Lab 06 加载时把已有事件接到 Phoenix
 web/index.html     页面骨架
 web/app.js         前端核心：连事件流、按事件更新页面、发送输入和授权
 web/render.js      渲染：Markdown、代码高亮、工具摘要和详情视图
@@ -203,12 +204,13 @@ python labs/01-mini-coding-agent/server.py --lab 05
 python labs/01-mini-coding-agent/server.py --lab 05 --ext subagent
 ```
 
-| 实战 | 扩展 | 用到的挂载点 | 对应理论篇 |
+| 实战 | 扩展 | 新增能力 | 对应理论篇 |
 |---|---|---|---|
 | [02 · 记住项目](../02-memory/) | `memory` | `system_prompt` | 07 Skill Loading、09 Memory |
 | [03 · 交给子 Agent](../03-subagent/) | `subagent` | `tools` | 06 Subagents |
 | [04 · 接真实 MCP](../04-mcp/) | `mcp` | `tools`、`system_prompt` | 14 MCP、03 Permission |
 | [05 · 修到测试通过](../05-verify/) | `verify` | `system_prompt`、`on_stop` | 17 Goal Loop、04 Hooks |
+| [06 · 看见 Agent 的运行轨迹](../06-observability/) | `observability` | 复用现有事件流接入 Phoenix，不增加 Extension 挂载点 | 01 Agent Loop、02 Tool Use、15 Agent Harness |
 
 挂载点刻意只有三个。权限不单独做挂载点，仍然由每个工具自己的 `confirm_prompt` 决定。扩展加进来的工具，走的也是 `_execute()` 这个唯一入口和同一套授权。
 

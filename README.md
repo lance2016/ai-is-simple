@@ -121,7 +121,7 @@
 
 理论篇讲清“零件是什么”，实战篇把零件装回一个小型 Coding Agent。
 
-实战篇和理论篇一样，也是 **主干 + 按需挂上的能力**：Lab 01 是主干；后面每个实战只写一个扩展文件，挂到同一个 Agent 上，Agent Loop 一行不改。
+实战篇和理论篇一样，也是 **主干 + 按需挂上的能力**：Lab 01 是主干；后面每个实战写一个扩展，挂到同一个 Agent 上，Agent Loop 一行不改。
 
 | 状态 | 实战 | 核心内容 | 对应理论篇 |
 | --- | --- | --- | --- |
@@ -130,12 +130,13 @@
 | ✅ | [03 · 交给子 Agent](./labs/03-subagent/) | `task` 工具背后是另一个只读的 `CodingAgent`，只交回总结 | 06 |
 | ✅ | [04 · 接真实 MCP](./labs/04-mcp/) | 手写 stdio MCP Server 和客户端，远程工具和本地工具走同一套授权 | 14、03 |
 | ✅ | [05 · 修到测试通过](./labs/05-verify/) | 模型想结束时由程序跑测试，没过就把失败输出送回循环 | 17、04 |
+| ✅ | [06 · 看见 Agent 的运行轨迹](./labs/06-observability/) | 用 Phoenix 和 OpenTelemetry 串起一次任务里的模型请求、工具调用、耗时与错误 | 01、02、15 |
 | 📖 | Pi 扩展阅读 | 理解 TypeScript/Node.js Harness 如何通过 Extension、Skill、Session 和 SDK 扩展 | — |
 
 想看哪个实战，一条命令启动，页面上会列出这个实战的示例任务，点一下就能用：
 
 ```bash
-python labs/01-mini-coding-agent/server.py --lab 05   # 换成 02 / 03 / 04 / 05
+python labs/01-mini-coding-agent/server.py --lab 05   # 换成 02 / 03 / 04 / 05 / 06
 ```
 
 想同时挂多个能力，再加 `--ext`，例如 `--lab 05 --ext subagent`。
@@ -346,11 +347,13 @@ ai-is-simple/
     │   ├── README.md
     │   ├── agent.py      # Agent 内核 + 扩展接口
     │   ├── server.py     # 网页界面的后端，--lab / --ext 加载扩展
+    │   ├── observability.py # 可选的 Phoenix 事件追踪桥
     │   └── web/          # 前端页面
     ├── 02-memory/        # 每个实战：extension.py + README.md，需要时带一个 demo/
     ├── 03-subagent/
     ├── 04-mcp/           # 另有 notes_server.py 和 notes/
-    └── 05-verify/
+    ├── 05-verify/
+    └── 06-observability/ # 另有 Phoenix Compose 配置和演示工作区
 ```
 
 每个章节都是一个独立的小单元：

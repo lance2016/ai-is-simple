@@ -24,6 +24,7 @@ from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
 from agent import CodingAgent, Extension, Workspace
+from observability import current_observer
 
 WEB_DIR = Path(__file__).resolve().parent / "web"
 LABS_DIR = Path(__file__).resolve().parents[1]
@@ -115,8 +116,9 @@ class AgentSession:
     ):
         self.events = EventLog()
         self.gate = PermissionGate(self.events)
+        self.observer = current_observer()
         self.agent = CodingAgent(
-            workspace, confirm=self.gate.ask, emit=self.events.publish, extensions=extensions
+            workspace, confirm=self.gate.ask, emit=self._publish_agent_event, extensions=extensions
         )
         self._lock = threading.Lock()
         self._running = False
@@ -127,6 +129,12 @@ class AgentSession:
             "extensions": [extension.name for extension in extensions],
             "samples": list(samples),
         })
+
+    def _publish_agent_event(self, event: dict) -> None:
+        """可选地记录 Phoenix Span，同时保持原有网页事件流。"""
+        if self.observer is not None:
+            self.observer.on_event(event)
+        self.events.publish(event)
 
     def submit(self, prompt: str) -> bool:
         """同一时间只跑一个任务。任务放到后台线程，HTTP 请求立刻返回。"""
@@ -141,7 +149,13 @@ class AgentSession:
 
     def _run(self, prompt: str) -> None:
         try:
-            self.agent.run(prompt)
+            if self.observer is None:
+                self.agent.run(prompt)
+            else:
+                # The background thread carries one active trace context through
+                # model calls, tool execution, and any permission wait.
+                with self.observer.agent_run(prompt):
+                    self.agent.run(prompt)
         except Exception as exc:
             # 异常也要出现在时间线上，不然页面只会一直显示"运行中"。
             self.events.publish({"type": "error", "content": f"{type(exc).__name__}: {exc}"})

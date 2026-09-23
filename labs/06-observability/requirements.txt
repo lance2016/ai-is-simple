@@ -1,0 +1,3 @@
+-r ../../requirements.txt
+arize-phoenix-otel>=0.16.0
+openinference-instrumentation-openai
