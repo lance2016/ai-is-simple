@@ -22,6 +22,12 @@
 - Pi 只作为扩展阅读或 TypeScript 实战入口，不替代理论篇的基础循环。
 - Lab 01 是实战主干；后续实战统一写成 `labs/NN-name/extension.py` 里的 `Extension` 子类（挂载点只有 `tools`、`system_prompt`、`on_stop`），通过 `server.py --lab NN` 或 `--ext name` 挂上；自带练习目录写在 `DEMO`，页面示例写在 `SAMPLES`。不修改 Lab 01 的 Agent Loop，也不单独做界面。
 
+## Git 约定
+
+- 本项目只有作者一个人维护，所有提交直接在 `main` 上进行。
+- 作者没有明确要求时，不要创建其他分支，也不要开 PR。
+- 只在作者要求时才提交；推送到远程同样要等作者明确要求。
+
 ## 文字偏好
 
 - 开头先用一句话总结核心结论。
