@@ -48,6 +48,11 @@
   font-size: 25px;
 }
 
+/* README sections are split by "---"; h2 already draws a rule, avoid two lines. */
+.vp-doc hr:has(+ h2) {
+  display: none;
+}
+
 .vp-doc p,
 .vp-doc li {
   line-height: 1.85;
@@ -145,69 +150,7 @@
   background-color: var(--vp-c-text-3);
 }
 
-/* ---------- Home ---------- */
-
-.home {
-  max-width: 960px;
-  margin: 0 auto;
-  padding: 32px 24px 64px;
-}
-
-.home .home-lead {
-  margin: 28px 0 0;
-  font-family: var(--ais-hand);
-  font-size: 22px;
-  line-height: 1.6;
-  color: var(--ais-ink);
-}
-
-.home .home-actions p {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 12px;
-  margin: 24px 0 8px;
-}
-
-.home .home-actions a {
-  padding: 0 20px;
-  border-radius: 20px;
-  line-height: 40px;
-  font-weight: 600;
-  text-decoration: none;
-  background: var(--vp-c-default-soft);
-  color: var(--vp-c-text-1);
-}
-
-.home .home-actions a:first-child {
-  background: var(--ais-blue);
-  color: #fff;
-}
-
-.dark .home .home-actions a:first-child {
-  color: #10172a;
-}
-
-.home .home-actions a:hover {
-  filter: brightness(1.08);
-}
-
-.home h2 {
-  margin-top: 48px;
-}
-
-.home ol + p img {
-  margin-top: 32px;
-}
-
 @media (max-width: 640px) {
-  .home {
-    padding: 16px 16px 48px;
-  }
-
-  .home .home-lead {
-    font-size: 19px;
-  }
-
   .vp-doc h1 {
     font-size: 28px;
   }

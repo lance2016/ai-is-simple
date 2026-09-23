@@ -35,10 +35,9 @@ export default defineConfig({
   base: '/ai-is-simple/',
 
   // The README files stay the single source of content; they only get
-  // renamed to index pages. Root README becomes the intro page because the
-  // site home is index.md.
+  // renamed to index pages. The root README is the site home.
   rewrites: {
-    'README.md': 'intro.md',
+    'README.md': 'index.md',
     'chapters/:dir/README.md': 'chapters/:dir/index.md',
     'labs/:dir/README.md': 'labs/:dir/index.md',
   },
@@ -60,7 +59,7 @@ export default defineConfig({
     // Order follows the README reading advice: main line first (00-03, 15),
     // so prev/next walks readers through it before the optional chapters.
     sidebar: [
-      { text: '项目介绍', link: '/intro' },
+      { text: '项目介绍', link: '/' },
       {
         text: '主线课程',
         items: [
