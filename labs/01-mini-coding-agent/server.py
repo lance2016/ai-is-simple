@@ -36,7 +36,8 @@ class EventLog:
 
     def publish(self, event: dict) -> None:
         with self._condition:
-            self._events.append({"id": len(self._events) + 1, **event})
+            # 时间戳让界面能显示每一步发生在什么时候、工具跑了多久。
+            self._events.append({"id": len(self._events) + 1, "time": time.time(), **event})
             self._condition.notify_all()
 
     def read_after(self, cursor: int, timeout: float) -> list[dict]:
