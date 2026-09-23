@@ -71,6 +71,13 @@ python chapters/15-integrated-harness/code.py
 
 如果新增一个“删除文件”的工具，应该只注册函数就结束吗？还需要在哪个 Harness 层加入确认和权限？
 
+<details>
+<summary>参考思路（先自己想一想，再展开）</summary>
+
+不能。注册函数只是让它“能被调用”。还要在 Harness 的权限层把它标成高风险操作：限制能删的路径范围，执行前请用户确认，并记录日志（可以放在 `PreToolUse` Hook）。模型提出删除只是请求，放不放行由 Harness 决定。
+
+</details>
+
 ## 参考
 
 - [learn-claude-code：s15 Integrated Harness](https://github.com/shareAI-lab/learn-claude-code/tree/main/s15_integrated_harness)

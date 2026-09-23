@@ -340,6 +340,13 @@ messages.append({"role": "user", "content": "我叫什么名字？"})
 
 是因为模型自己一直记着，还是因为程序做了什么？
 
+<details>
+<summary>参考思路（先自己想一想，再展开）</summary>
+
+是程序做的。每次请求时，程序把前 20 轮的 user / assistant 消息重新放进 `messages` 发出去，模型只是在这一次请求里读到了它们。聊得越久，这份历史越长，这也是第 08 章要处理上下文变长的原因。
+
+</details>
+
 ## 参考
 
 - [DeepSeek OpenAI SDK 调用示例](https://api-docs.deepseek.com/api_samples/chat_python/)

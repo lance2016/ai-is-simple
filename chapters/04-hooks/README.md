@@ -4,6 +4,8 @@
 
 > **一句话总结：Hooks 让循环保持稳定，把日志、权限和检查逻辑挂到固定节点上。**
 
+**本章新增：** 把权限、日志这类旁路逻辑搬出循环，循环里只留下 `trigger_hooks()` 触发点。
+
 第 03 章加入权限检查后，`agent_loop` 里已经出现了新的判断。
 
 如果再继续加入日志、统计、结果校验和清理逻辑，循环很快会变成一团线：
@@ -171,6 +173,13 @@ python chapters/04-hooks/code.py
 ## 想一想
 
 如果想在每次工具执行后统计耗时，应该修改 `agent_loop`，还是注册一个 `PostToolUse` Hook？
+
+<details>
+<summary>参考思路（先自己想一想，再展开）</summary>
+
+注册 Hook，不改 `agent_loop`。可以在 `PreToolUse` 记下开始时间，在 `PostToolUse` 算出耗时。统计耗时不影响任务下一步怎么走，属于旁路逻辑，正好适合 Hook。
+
+</details>
 
 ## 参考
 
