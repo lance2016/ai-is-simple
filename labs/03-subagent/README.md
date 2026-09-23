@@ -38,7 +38,7 @@
 ## 跑起来
 
 ```bash
-python labs/01-mini-coding-agent/server.py --lab 03
+uv run python labs/01-mini-coding-agent/server.py --lab 03
 ```
 
 会自动挂上 `subagent` 扩展，工作区是项目根目录。页面上会显示下面这几个示例，点一下就能填进输入框。
@@ -51,7 +51,7 @@ python labs/01-mini-coding-agent/server.py --lab 03
 
 实测结果：子 Agent 在自己的上下文里查完了所有章节，交回了章节名、行号和依据；主 Agent 的 `messages` 里只有 5 条消息（system、user、task 调用、task 结果、最终回答）。
 
-再试一个小问题，比如“requirements.txt 里有哪些依赖”。模型应该直接用 `read`，不走子 Agent。工具说明里写了“读一两个文件就能回答的事，不要用它”。
+再试一个小问题，比如“pyproject.toml 里有哪些依赖”。模型应该直接用 `read`，不走子 Agent。工具说明里写了“读一两个文件就能回答的事，不要用它”。
 
 ## 代价
 

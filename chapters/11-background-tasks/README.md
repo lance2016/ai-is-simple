@@ -62,7 +62,7 @@ collect_background_jobs()
 运行：
 
 ```bash
-python chapters/11-background-tasks/code.py
+uv run python chapters/11-background-tasks/code.py
 ```
 
 可以输入：

@@ -97,7 +97,7 @@ DEEPSEEK_MODEL=deepseek-flash
 运行：
 
 ```bash
-python chapters/07-skill-loading/code.py
+uv run python chapters/07-skill-loading/code.py
 ```
 
 可以试试：

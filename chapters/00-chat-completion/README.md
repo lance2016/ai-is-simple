@@ -312,7 +312,7 @@ DEEPSEEK_MODEL=deepseek-flash
 运行：
 
 ```bash
-python chapters/00-chat-completion/code.py
+uv run python chapters/00-chat-completion/code.py
 ```
 
 重点观察这两行：

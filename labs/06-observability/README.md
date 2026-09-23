@@ -52,23 +52,23 @@ PHOENIX_UI_PORT=16007 PHOENIX_GRPC_PORT=14317 docker compose -f labs/06-observab
 换了页面端口后，启动 Agent 时也要把收集地址设成相同端口：
 
 ```bash
-PHOENIX_COLLECTOR_ENDPOINT=http://127.0.0.1:16007 python labs/01-mini-coding-agent/server.py --lab 06
+PHOENIX_COLLECTOR_ENDPOINT=http://127.0.0.1:16007 uv run --group observability python labs/01-mini-coding-agent/server.py --lab 06
 ```
 
 Compose 的本地数据库密码默认是练习用的 `phoenix-local-only`。如果通过 `PHOENIX_DB_PASSWORD` 覆盖，只使用 URL 安全的字母和数字。
 
 ## 跑起来
 
-先在项目根目录的 `.env` 里准备 DeepSeek 配置，格式与 Lab 01 相同。再安装本实战额外需要的依赖：
+先在项目根目录的 `.env` 里准备 DeepSeek 配置，格式与 Lab 01 相同。运行时加上 `observability` 依赖组，uv 会按锁文件准备 Phoenix 相关依赖：
 
 ```bash
-python -m pip install -r labs/06-observability/requirements.txt
+uv sync --group observability
 ```
 
 启动 Agent：
 
 ```bash
-python labs/01-mini-coding-agent/server.py --lab 06
+uv run --group observability python labs/01-mini-coding-agent/server.py --lab 06
 ```
 
 打开 <http://127.0.0.1:8765>，页面会切到 `demo/` 工作区并显示示例任务。先试只读问题；再试修复问题，授权后会看到模型请求、工具执行和验证命令各自形成的 Span。
@@ -77,10 +77,18 @@ python labs/01-mini-coding-agent/server.py --lab 06
 
 ## 在 Phoenix 里看什么
 
+![Phoenix 项目列表中的 Lab 06 项目](./screenshots/phoenix-project-list.jpg)
+
+*项目概览：找到 `ai-is-simple-lab-06`，这里能看到 Trace 数量和延迟统计；具体数值会随练习变化。*
+
 1. 打开 `ai-is-simple-lab-06` 项目，选择刚产生的 Trace。
 2. 展开 `agent.run`：它记录用户任务，并覆盖整次 Agent 运行。
 3. 展开 `agent.model_turn`：里面的 OpenAI SDK 自动追踪会显示模型请求；`agent.tool` 会显示工具参数、返回值和结果状态。
 4. 比较时间线，看看等待模型、工具执行或授权分别花了多久。故意失败的示例可以用来定位错误发生在哪一步。
+
+![Phoenix 中展开的 Trace 树和模型 Span 详情](./screenshots/phoenix-span-detail.jpg)
+
+*实战页面示例：左侧 Trace 树串起 Agent、模型和工具步骤；右侧显示当前选中模型 Span 的输出。每次运行产生的内容和耗时会不同。*
 
 本实战会把模型请求中的提示词和回复，以及工具参数和返回值发到本机 Phoenix。工具内容超过 8000 个字符时会截断。示例默认使用单独的 `demo/` 工作区；查看真实项目轨迹时，先确认这些内容适合保存在本机数据库中。
 

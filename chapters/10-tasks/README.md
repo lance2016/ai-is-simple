@@ -112,7 +112,7 @@ DEEPSEEK_MODEL=deepseek-flash
 运行：
 
 ```bash
-python chapters/10-tasks/code.py
+uv run python chapters/10-tasks/code.py
 ```
 
 可以试试：

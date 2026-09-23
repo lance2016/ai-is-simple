@@ -1,5 +1,7 @@
 <div align="center">
 
+<p><a href="https://lance2016.github.io/ai-is-simple/"><strong>📖 在线阅读文档</strong></a></p>
+
 <img src="./assets/readme-hero.png" alt="AI 如此简单" width="100%" />
 
 # AI 如此简单
@@ -136,7 +138,7 @@
 想看哪个实战，一条命令启动，页面上会列出这个实战的示例任务，点一下就能用：
 
 ```bash
-python labs/01-mini-coding-agent/server.py --lab 05   # 换成 02 / 03 / 04 / 05 / 06
+uv run python labs/01-mini-coding-agent/server.py --lab 05   # 换成 02 / 03 / 04 / 05 / 06
 ```
 
 想同时挂多个能力，再加 `--ext`，例如 `--lab 05 --ext subagent`。
@@ -171,17 +173,13 @@ cd ai-is-simple
 
 ### 2. 创建 Python 环境
 
+先安装 [uv](https://docs.astral.sh/uv/getting-started/installation/)，然后在项目根目录运行：
+
 ```bash
-python3 -m venv .venv
-source .venv/bin/activate
-pip install -r requirements.txt
+uv sync
 ```
 
-Windows PowerShell：
-
-```powershell
-.venv\Scripts\Activate.ps1
-```
+`uv sync` 会创建 `.venv` 并安装锁定版本的依赖。后续用 `uv run` 运行 Python 文件，不需要手动激活环境。
 
 ### 3. 配置模型
 
@@ -201,7 +199,7 @@ DEEPSEEK_MODEL=deepseek-flash
 ### 4. 运行第 00 章
 
 ```bash
-python chapters/00-chat-completion/code.py
+uv run python chapters/00-chat-completion/code.py
 ```
 
 先从一次最普通的模型请求开始，再继续阅读第 01 章，理解最小可运行 Agent。
@@ -209,14 +207,14 @@ python chapters/00-chat-completion/code.py
 如果想直接运行实战篇：
 
 ```bash
-python labs/01-mini-coding-agent/server.py
+uv run python labs/01-mini-coding-agent/server.py
 ```
 
 然后打开 <http://127.0.0.1:8765>，在输入框里试试：「看看 labs 目录里有什么，读一下里面的 README」。
 
 ### 5. 本地打开文档站（可选）
 
-课程也可以在网站上连续阅读：<https://lance2016.github.io/ai-is-simple/>。想在本地预览：
+想在本地预览文档站：
 
 ```bash
 npm install
@@ -284,7 +282,8 @@ ai-is-simple/
 │   ├── chapter-16-workflow-runtime.png
 │   ├── chapter-17-goal-loop.png
 │   └── lab-01-mini-coding-agent.png
-├── requirements.txt
+├── pyproject.toml
+├── uv.lock
 ├── .env.example
 ├── chapters/
 │   ├── 00-chat-completion/
@@ -353,7 +352,7 @@ ai-is-simple/
     ├── 03-subagent/
     ├── 04-mcp/           # 另有 notes_server.py 和 notes/
     ├── 05-verify/
-    └── 06-observability/ # 另有 Phoenix Compose 配置和演示工作区
+    └── 06-observability/ # Phoenix Compose 配置、演示工作区和实战截图
 ```
 
 每个章节都是一个独立的小单元：

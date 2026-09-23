@@ -68,7 +68,7 @@ collect_team_messages()
 运行：
 
 ```bash
-python chapters/13-agent-teams/code.py
+uv run python chapters/13-agent-teams/code.py
 ```
 
 可以输入：

@@ -57,7 +57,7 @@ DEEPSEEK_MODEL=deepseek-flash
 然后启动：
 
 ```bash
-python labs/01-mini-coding-agent/server.py
+uv run python labs/01-mini-coding-agent/server.py
 ```
 
 打开 <http://127.0.0.1:8765>，直接在输入框里说话。
@@ -65,7 +65,7 @@ python labs/01-mini-coding-agent/server.py
 默认工作区是本项目根目录。想让它只在某个目录里活动：
 
 ```bash
-python labs/01-mini-coding-agent/server.py --workspace ~/some-project
+uv run python labs/01-mini-coding-agent/server.py --workspace ~/some-project
 ```
 
 <details>
@@ -193,7 +193,7 @@ class Extension:
 每个实战目录里放一个 `extension.py`，提供 `create(workspace)`。想看哪个实战，一条命令启动：
 
 ```bash
-python labs/01-mini-coding-agent/server.py --lab 05
+uv run python labs/01-mini-coding-agent/server.py --lab 05
 ```
 
 `--lab 05` 会挂上 `labs/05-verify/` 的扩展。如果那个实战在 `DEMO` 里写了自带的练习目录，工作区也会自动切过去；页面空白时显示它在 `SAMPLES` 里写的示例任务。
@@ -201,7 +201,7 @@ python labs/01-mini-coding-agent/server.py --lab 05
 想自由组合，就用 `--ext`，可以写多次，按目录名后半截匹配（`--ext memory` 找 `labs/NN-memory/`）：
 
 ```bash
-python labs/01-mini-coding-agent/server.py --lab 05 --ext subagent
+uv run python labs/01-mini-coding-agent/server.py --lab 05 --ext subagent
 ```
 
 | 实战 | 扩展 | 新增能力 | 对应理论篇 |

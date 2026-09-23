@@ -8,7 +8,7 @@
 整个扩展只用到 Extension 的两个挂载点：system_prompt 和 on_stop。
 
 启动：
-  python labs/01-mini-coding-agent/server.py --lab 05
+  uv run python labs/01-mini-coding-agent/server.py --lab 05
 """
 
 from __future__ import annotations

@@ -27,7 +27,7 @@ def enable_phoenix() -> PhoenixTraceObserver:
     except ImportError as exc:
         raise SystemExit(
             "Lab 06 需要先安装扩展依赖："
-            "python -m pip install -r labs/06-observability/requirements.txt"
+            "uv sync --group observability"
         ) from exc
 
     # Python Agent 在宿主机运行，所以这里连接发布到本机的 Phoenix 端口。

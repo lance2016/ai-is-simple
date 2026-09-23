@@ -159,7 +159,7 @@ DEEPSEEK_MODEL=deepseek-flash
 运行：
 
 ```bash
-python chapters/04-hooks/code.py
+uv run python chapters/04-hooks/code.py
 ```
 
 可以试试读取文件或写入笔记，然后观察终端里的 `[hook]` 日志。

@@ -112,7 +112,7 @@ DEEPSEEK_MODEL=deepseek-flash
 运行：
 
 ```bash
-python chapters/03-permission/code.py
+uv run python chapters/03-permission/code.py
 ```
 
 可以试试：

@@ -48,7 +48,7 @@ result = harness.dispatch(tool_name, arguments)
 运行：
 
 ```bash
-python chapters/15-integrated-harness/code.py
+uv run python chapters/15-integrated-harness/code.py
 ```
 
 可以输入：

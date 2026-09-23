@@ -46,7 +46,7 @@ if not message.tool_calls:
 运行：
 
 ```bash
-python chapters/17-goal-loop/code.py
+uv run python chapters/17-goal-loop/code.py
 ```
 
 可以输入：

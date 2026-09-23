@@ -39,7 +39,7 @@
 ## 跑起来
 
 ```bash
-python labs/01-mini-coding-agent/server.py --lab 02
+uv run python labs/01-mini-coding-agent/server.py --lab 02
 ```
 
 会自动挂上 `memory` 扩展，并把工作区切到 `demo/`。页面上会显示下面这几个示例，点一下就能填进输入框。

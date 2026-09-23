@@ -66,7 +66,7 @@ call_mcp_tool("project_docs", "search", {"query": "assets"})
 运行：
 
 ```bash
-python chapters/14-mcp-plugin/code.py
+uv run python chapters/14-mcp-plugin/code.py
 ```
 
 可以输入：

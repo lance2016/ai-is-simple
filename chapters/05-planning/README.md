@@ -103,7 +103,7 @@ DEEPSEEK_MODEL=deepseek-flash
 运行：
 
 ```bash
-python chapters/05-planning/code.py
+uv run python chapters/05-planning/code.py
 ```
 
 可以试试：

@@ -11,5 +11,10 @@
     "lxgw-wenkai-webfont": "^1.7.0",
     "medium-zoom": "^1.1.0",
     "vitepress": "^1.6.4"
+  },
+  "overrides": {
+    "vitepress": {
+      "vite": "6.4.3"
+    }
   }
 }

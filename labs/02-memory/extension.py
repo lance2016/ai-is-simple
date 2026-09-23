@@ -8,7 +8,7 @@
 模型想记东西，就用现有的 edit / write 去改 MEMORY.md，照样要你点头。
 
 启动：
-  python labs/01-mini-coding-agent/server.py --lab 02
+  uv run python labs/01-mini-coding-agent/server.py --lab 02
 """
 
 from __future__ import annotations

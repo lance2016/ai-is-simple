@@ -101,7 +101,7 @@ DEEPSEEK_MODEL=deepseek-flash
 运行：
 
 ```bash
-python chapters/08-context-compact/code.py
+uv run python chapters/08-context-compact/code.py
 ```
 
 可以试试读取多个较长文件，再观察 `.task_outputs/` 和 `.transcripts/` 目录。

@@ -8,7 +8,7 @@
   - 最后只把一段总结交回来，作为 task 的工具结果。
 
 启动：
-  python labs/01-mini-coding-agent/server.py --lab 03
+  uv run python labs/01-mini-coding-agent/server.py --lab 03
 """
 
 from __future__ import annotations
@@ -23,7 +23,7 @@ from agent import CodingAgent, Extension, Tool, Workspace  # noqa: E402
 # 页面空白时显示的示例任务，点一下就填进输入框。
 SAMPLES = (
     "请交给子 Agent 调查：chapters 目录下哪几章的 code.py 用到了 threading 模块？交回章节名列表。",
-    "requirements.txt 里有哪些依赖？",
+    "pyproject.toml 里有哪些依赖？",
 )
 
 SUBAGENT_RULES = """你是一个子 Agent，只负责完成主 Agent 交给你的一个调查任务。

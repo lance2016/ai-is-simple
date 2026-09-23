@@ -41,7 +41,7 @@ run_workflow("review_project", {"subject": "理解 Agent Harness"})
 运行：
 
 ```bash
-python chapters/16-workflow-runtime/code.py
+uv run python chapters/16-workflow-runtime/code.py
 ```
 
 可以输入：

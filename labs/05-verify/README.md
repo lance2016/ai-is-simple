@@ -51,7 +51,7 @@
 `demo/` 里有一个故意留了两个 bug 的 `pricing.py`，还有 4 个测试，其中 3 个会失败。
 
 ```bash
-python labs/01-mini-coding-agent/server.py --lab 05
+uv run python labs/01-mini-coding-agent/server.py --lab 05
 ```
 
 会自动挂上 `verify` 扩展，并把工作区切到 `demo/`。页面上会显示下面这几个示例，点一下就能填进输入框。
@@ -75,7 +75,7 @@ pricing.py 里的 apply_discount 有 bug，只修它，别动别的函数
 想换成别的验收命令，用环境变量：
 
 ```bash
-VERIFY_COMMAND="python3 -m pytest -q" python labs/01-mini-coding-agent/server.py --workspace 你的项目 --ext verify
+VERIFY_COMMAND="python3 -m pytest -q" uv run python labs/01-mini-coding-agent/server.py --workspace 你的项目 --ext verify
 ```
 
 > Agent 会真的改掉 `demo/pricing.py`。想重新练习，运行 `git checkout labs/05-verify/demo` 恢复。

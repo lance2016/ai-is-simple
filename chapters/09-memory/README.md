@@ -109,7 +109,7 @@ DEEPSEEK_MODEL=deepseek-flash
 运行：
 
 ```bash
-python chapters/09-memory/code.py
+uv run python chapters/09-memory/code.py
 ```
 
 可以先输入：

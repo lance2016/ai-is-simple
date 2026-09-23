@@ -67,7 +67,7 @@ cancel_cron("cron_...")
 运行：
 
 ```bash
-python chapters/12-cron-scheduler/code.py
+uv run python chapters/12-cron-scheduler/code.py
 ```
 
 可以输入：

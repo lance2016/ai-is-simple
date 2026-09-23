@@ -1,0 +1,19 @@
+[project]
+name = "ai-is-simple"
+version = "0.1.0"
+description = "面向初学者的 Agent 理论与实战课程"
+requires-python = ">=3.10"
+dependencies = [
+    "openai>=1.0.0",
+    "python-dotenv>=1.0.0",
+    "socksio>=1.0.0",
+]
+
+[dependency-groups]
+observability = [
+    "arize-phoenix-otel>=0.16.0",
+    "openinference-instrumentation-openai",
+]
+
+[tool.uv]
+package = false

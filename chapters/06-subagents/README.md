@@ -38,7 +38,7 @@ Subagent：新的 messages[]
 
 | 场景 | 更合适的选择 | 代价或原因 |
 | --- | --- | --- |
-| 只读 `requirements.txt`，回答依赖是什么 | 一个 `read_file` | 委派反而多了一次模型调用 |
+| 只读 `pyproject.toml`，回答依赖是什么 | 一个 `read_file` | 委派反而多了一次模型调用 |
 | 连续调用两三个工具，主 Agent 能看懂结果 | 主 Agent 自己继续循环 | 路径短，沟通成本最低 |
 | 阅读多个文件、整理证据，再给出独立结论 | Subagent | 多一段上下文和一次委派，但主上下文更干净 |
 
@@ -117,7 +117,7 @@ DEEPSEEK_MODEL=deepseek-flash
 运行：
 
 ```bash
-python chapters/06-subagents/code.py
+uv run python chapters/06-subagents/code.py
 ```
 
 可以试试：

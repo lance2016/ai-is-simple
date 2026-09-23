@@ -10,7 +10,7 @@
 同一个 _execute 入口，同一套授权弹窗。MCP 只负责"工具在哪、怎么调"，不负责"该不该调"。
 
 启动：
-  python labs/01-mini-coding-agent/server.py --lab 04
+  uv run python labs/01-mini-coding-agent/server.py --lab 04
 """
 
 from __future__ import annotations
