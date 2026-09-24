@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""实战篇 04：接入 MCP，让 Agent 读写笔记
+"""实战篇 04：用 MCP 让 Agent 读写笔记
 
 启动时做三件事：
   1. 把 Server 当成子进程拉起来，用 stdin / stdout 说 JSON-RPC；

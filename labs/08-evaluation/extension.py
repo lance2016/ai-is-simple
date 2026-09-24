@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""实战篇 08：用固定任务比较 Agent 修改前后的表现"""
+"""实战篇 08：改了 Agent 之后，怎样知道效果有没有变好？"""
 
 from __future__ import annotations
 

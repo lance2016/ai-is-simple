@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""实战篇 06：给 Agent 加运行记录，方便排查问题"""
+"""实战篇 06：把 Agent 的每一步记下来，出错时方便排查"""
 
 from __future__ import annotations
 
