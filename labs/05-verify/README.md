@@ -1,10 +1,10 @@
-# 实战篇 05：代码自动验收
+# 实战篇 05：Hooks：代码验收
 
 > **一句话总结：模型说“改好了”不算数，程序自己跑一遍测试，没通过就把失败输出塞回循环接着修。**
 
-**本实战新增：** 一个 `on_stop` 扩展，大约 110 行，其中一半是注释。Agent Loop 一行没改。
+**本实战新增：** 用第 04 章的 `Stop` Hook（`on_stop`）在 Agent 准备结束时运行验收命令。Agent Loop 一行没改。
 
-对应理论篇：[第 17 章 Goal Loop](../../chapters/17-goal-loop/)、[第 04 章 Hooks](../../chapters/04-hooks/) 里的 `Stop` 节点。
+主要对应理论篇：[第 04 章 Hooks](../../chapters/04-hooks/) 的 `Stop` 节点。第 17 章 [Goal Loop](../../chapters/17-goal-loop/) 也讨论任务何时完成，但用另一个模型评审目标；本实战用测试命令检查代码结果。
 
 ## 先看结构
 

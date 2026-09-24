@@ -206,10 +206,10 @@ uv run python labs/01-mini-coding-agent/server.py --lab 05 --ext subagent
 
 | 实战 | 扩展 | 新增能力 | 对应理论篇 |
 |---|---|---|---|
-| [02 · 项目记忆](../02-memory/) | `memory` | `system_prompt` | 07 Skill Loading、09 Memory |
+| [02 · 长期记忆](../02-memory/) | `memory` | `system_prompt` | 09 Memory（对照 07 Skill Loading） |
 | [03 · 子 Agent 任务委派](../03-subagent/) | `subagent` | `tools` | 06 Subagents |
 | [04 · MCP 工具接入](../04-mcp/) | `mcp` | `tools`、`system_prompt` | 14 MCP、03 Permission |
-| [05 · 代码自动验收](../05-verify/) | `verify` | `system_prompt`、`on_stop` | 17 Goal Loop、04 Hooks |
+| [05 · Hooks：代码验收](../05-verify/) | `verify` | `system_prompt`、`on_stop` | 04 Hooks（对照 17 Goal Loop） |
 | [06 · Agent 可观测性](../06-observability/) | `observability` | 复用现有事件流接入 Phoenix，不增加 Extension 挂载点 | 01 Agent Loop、02 Tool Use、15 Agent Harness |
 | [07 · 上下文管理](../07-context-management/) | `context` | 任务结束后压缩旧历史，保留当前任务 | 08 Context Compact、04 Hooks |
 | [08 · Agent 效果评估](../08-evaluation/) | `evaluation` | 用固定案例和 on_stop 评分器标注行为；离线实验比较版本 | 01 Agent Loop、15 Agent Harness |

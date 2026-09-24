@@ -47,6 +47,20 @@ Memory 可以先理解成四步：
 
 Memory 不是压缩版聊天记录，也不应该替代 Context Compact。
 
+## 长期记忆保存哪类信息
+
+长期记忆通常按内容用途来组织，而不是把所有信息都塞进同一份笔记：
+
+| 类型 | 保存内容 | 例子 |
+| --- | --- | --- |
+| 语义记忆 | 相对稳定的事实和偏好 | 项目使用 DeepSeek；回答优先用中文 |
+| 情景记忆 | 某次任务、故障或决定的经过 | 某次修复发现偶数项中位数取值有误 |
+| 程序性知识 | 可重复执行的方法和步骤 | 代码审查清单、发布流程 |
+
+本项目把程序性知识作为 Skill 单独维护：Memory 记录 Agent 从具体任务中保留的背景，Skill 是人整理、可复用的操作规范。两者都可以按需加载，但保存目的不同，见[第 07 章 Skill Loading](../07-skill-loading/)。
+
+存储也可以分层：每个请求都会读取的用户或项目概要应保持精简；具体经历和资料放在独立记录中，根据当前任务检索。用户与项目的数据还可以放在不同的命名空间，避免一条记忆误用于另一个项目。没有一种固定目录适合所有 Agent，检索方式和写入时机也要按数据规模及使用场景决定。
+
 ## 一个最小的 Memory Store
 
 本章使用 `.memory/` 目录，每条记忆单独保存成 Markdown 文件：
@@ -58,7 +72,7 @@ Memory 不是压缩版聊天记录，也不应该替代 Context Compact。
 └── project-default-model.md
 ```
 
-`MEMORY.md` 只做索引，正文留在具体文件里。这样可以先看目录，再按需读取完整记忆，和第 07 章的 Skill Loading 有相似之处。
+`MEMORY.md` 只做索引，正文留在具体文件里。这样可以先看目录，再按需读取完整记忆。按需读取是存取方式上的相似点；Skill 与 Memory 保存的内容仍然不同。
 
 每条记录至少包含：
 
@@ -145,5 +159,8 @@ uv run python chapters/09-memory/code.py
 
 ## 参考
 
+- [LangGraph：Memory 概览](https://docs.langchain.com/oss/python/concepts/memory)
+- [LangGraph：长期记忆的存储与召回](https://docs.langchain.com/oss/python/langchain/long-term-memory)
+- [OpenAI Agents SDK：Sessions 对话历史](https://openai.github.io/openai-agents-python/sessions/)
 - [learn-claude-code：s09 Memory](https://github.com/shareAI-lab/learn-claude-code/tree/main/s09_memory)
 - [DeepSeek Tool Calls 官方说明](https://api-docs.deepseek.com/guides/tool_calls/)

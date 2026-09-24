@@ -92,10 +92,10 @@ export default defineConfig({
         text: '实战',
         items: [
           { text: 'Lab 01 · Coding Agent 搭建', link: '/labs/01-mini-coding-agent/' },
-          { text: 'Lab 02 · 项目记忆', link: '/labs/02-memory/' },
+          { text: 'Lab 02 · 长期记忆', link: '/labs/02-memory/' },
           { text: 'Lab 03 · 子 Agent 任务委派', link: '/labs/03-subagent/' },
           { text: 'Lab 04 · MCP 工具接入', link: '/labs/04-mcp/' },
-          { text: 'Lab 05 · 代码自动验收', link: '/labs/05-verify/' },
+          { text: 'Lab 05 · Hooks：代码验收', link: '/labs/05-verify/' },
           { text: 'Lab 06 · Agent 可观测性', link: '/labs/06-observability/' },
           { text: 'Lab 07 · 上下文管理', link: '/labs/07-context-management/' },
           { text: 'Lab 08 · Agent 效果评估', link: '/labs/08-evaluation/' },

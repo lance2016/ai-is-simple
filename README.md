@@ -130,12 +130,12 @@
 | 状态 | 实战 | 核心内容 | 对应理论篇 |
 | --- | --- | --- | --- |
 | ✅ | [01 · Coding Agent 搭建](./labs/01-mini-coding-agent/) | 用 Python + DeepSeek 实现 `read / write / edit / bash` 四个工具，配一个网页界面：流式输出、逐步展示 tool call、改动前等你授权；留好三个扩展挂载点 | 01～04、15 |
-| ✅ | [02 · 项目记忆](./labs/02-memory/) | `.agent/MEMORY.md` 每次带进 system prompt，技能只放目录、用到再读；不加新工具 | 07、09 |
+| ✅ | [02 · 长期记忆](./labs/02-memory/) | 稳定项目规则常驻，过往经验按需读取；用一个 Skill 对照记忆与操作规范的区别 | 09（对照 07） |
 | ✅ | [03 · 子 Agent 任务委派](./labs/03-subagent/) | `task` 工具背后是另一个只读的 `CodingAgent`，只交回总结 | 06 |
 | ✅ | [04 · MCP 工具接入](./labs/04-mcp/) | 手写 stdio MCP Server 和客户端，远程工具和本地工具走同一套授权 | 14、03 |
-| ✅ | [05 · 代码自动验收](./labs/05-verify/) | 模型想结束时由程序跑测试，没过就把失败输出送回循环 | 17、04 |
+| ✅ | [05 · Hooks：代码验收](./labs/05-verify/) | 用第 04 章的 Stop Hook 在结束前运行测试；失败时把结果交回循环，和第 17 章的模型评审作对照 | 04（对照 17） |
 | ✅ | [06 · Agent 可观测性](./labs/06-observability/) | 用 Phoenix 和 OpenTelemetry 串起一次任务里的模型请求、工具调用、耗时与错误 | 01、02、15 |
-| ✅ | [07 · 上下文管理](./labs/07-context-management/) | 在任务结束后上下文管理和关键信息 | 08、04 |
+| ✅ | [07 · 上下文管理](./labs/07-context-management/) | 任务结束后压缩旧对话，保留当前任务和关键信息 | 08、04 |
 | ✅ | [08 · Agent 效果评估](./labs/08-evaluation/) | 用固定数据集和评分器比较 Agent 版本，并回到 Trace 定位失败 | 01、15 |
 | 📖 | Pi 扩展阅读 | 理解 TypeScript/Node.js Harness 如何通过 Extension、Skill、Session 和 SDK 扩展 | — |
 
