@@ -30,7 +30,7 @@
 2. **项目卡片 `ai-is-simple-lab-06`**：项目名来自代码里的 `project_name`。同一个应用的 Trace 都进这个项目。
 3. **Traces**：这个项目里有多少条 Trace。这里是 1，说明只跑了一次任务。
 4. **Latency P50**：一半任务在这个时间内完成。只有一条 Trace 时，它就是那条 Trace 的总耗时 7.1 秒。
-5. **Sessions**：有多少段多轮对话。本实战没有给 Trace 标会话编号，所以是 0，后面“多轮对话”一节会讲怎么补上。
+5. **Sessions**：有多少段多轮对话。这张截图拍于代码接入 Session 之前，所以是 0；现在运行会看到实际数量，后面“多轮对话”一节会细讲。
 6. **`default` 项目**：没指定项目名时，Trace 会落到这里。如果你在自己的项目里找不到轨迹，先来这里看看。
 
 四个概念的关系可以对照这张表：
@@ -157,30 +157,66 @@ agent.run                           ← 用户任务（根 Span）
 
 ### 用 Session 关联
 
-Phoenix 遵循 OpenInference 的约定：给 Span 加上同一个 `session.id` 属性，这些 Trace 就会归到同一个 Session 下面。在项目的 `Sessions` 标签页里，它们会按时间排成一段聊天记录，每轮的输入输出、耗时和 token 都能对照着看。
+Phoenix 遵循 OpenInference 的约定：给 Span 加上同一个 `session.id` 属性，这些 Trace 就会归到同一个 Session 下面。
 
-做法是在对话开始时生成一个会话编号，之后每轮都带上它：
+本实战在网页后端为每段对话生成一个会话编号，点“重置”清空上下文时换一个新的：
 
 ~~~python
-import uuid
-from openinference.instrumentation import using_session
+# server.py 的 AgentSession
+self.conversation_id = str(uuid.uuid4())      # 创建时生成，reset() 时重新生成
 
-conversation_id = str(uuid.uuid4())  # 重置对话时换一个新的
-
-with using_session(conversation_id):
-    with self.observer.agent_run(prompt):
-        self.agent.run(prompt)
+with self.observer.agent_run(prompt, session_id=self.conversation_id):
+    self.agent.run(prompt)
 ~~~
 
-`using_session()` 把会话编号放进当前上下文，里面自动产生的模型 Span 都会带上 `session.id`。手工创建的 `agent.run` 最稳妥的做法是也在属性里显式写上 `session.id`。
+`agent_run()` 做两件事：把 `session.id` 写进根 Span 的属性，再用 OpenInference 的 `using_session()` 把编号放进当前上下文，让里面自动产生的模型 Span 也带上它：
 
-**注意：本实战的代码还没有做这一步**，所以截图里 Sessions 是 0。多轮对话照样能跑，只是 Phoenix 里看到的是几条互不关联的 Trace。
+~~~python
+if session_id:
+    attributes["session.id"] = session_id
+...
+with _session_context(session_id):   # 内部就是 using_session(session_id)
+    yield
+~~~
+
+完整代码见 `labs/01-mini-coding-agent/observability.py`。实测下来，一段对话里所有 Span 都带着同一个 `session.id`，包括自动产生的 `ChatCompletion`。
+
+### 在 Phoenix 里看 Session
+
+下面是连续问了三个问题、点“重置”、再说一句“你好”之后的 Sessions 标签页：
+
+![Phoenix Sessions 列表，带编号标注](./screenshots/phoenix-sessions-annotated.jpg)
+
+1. **Sessions 标签页**：在项目页里，和 Spans、Traces 并列。
+2. **session id**：每行一段对话，就是代码里生成的 `conversation_id`。重置前后是两个不同的编号。
+3. **first input / last output**：这段对话的第一句提问和最后一句回答，用来快速认出是哪段对话。
+4. **统计**：一共 2 段对话，平均每段 2 条 Trace（第一段 3 条，第二段 1 条）。
+
+点开第一段对话，能看到它像聊天记录一样按轮排开：
+
+![Phoenix Session 详情，带编号标注](./screenshots/phoenix-session-detail-annotated.jpg)
+
+1. **Session ID**：这段对话的编号。
+2. **汇总**：整段对话用了多少 token、每轮耗时的中位数。
+3. **Turns / Traces**：3 轮对话，对应 3 条 Trace。
+4. **轮次列表**：每轮的提问、回答开头、token 和耗时。第一轮调了工具，有两次模型请求，所以 token 最多、耗时最长。
+5. **Turn 和 Trace 的对应**：每一轮都有自己的 Trace ID，点进去就回到上面讲过的那棵 Span 树。
 
 ### 多轮对话里的 Trace 要怎么读
 
-- **看 token 有没有逐轮上涨。** 第二轮的第一次模型请求，输入里已经包含第一轮的全部对话和工具结果。所以后面几轮就算问题很简单，token 也可能很大。
+**看 token 有没有逐轮上涨。** 同一次测试里，每轮第一次模型请求的输入 token 是这样的：
+
+| 轮次 | 提问 | 输入 token |
+| --- | --- | --- |
+| 第 1 轮 | 只读 calculator.py，解释计算过程 | 812 |
+| 第 2 轮 | 那如果传入空列表会怎样？ | 1,368 |
+| 第 3 轮 | 用一句话总结我们刚才聊了什么 | 1,666 |
+| 重置后 | 你好 | 797 |
+
+后面的问题更短，输入却更大，因为每次请求都带着前面所有的对话和工具结果。重置之后上下文清空，又回到了起点。
+
 - **答案和前面对不上时，看 Input。** 打开这一轮的 `ChatCompletion`，检查模型拿到的历史消息里有没有你以为它记得的内容。
-- **同一个用户的多段对话**，可以再加一个 `user.id`，用法和 `session.id` 一样。
+- **同一个用户的多段对话**，可以再加一个 `user.id`，用法和 `session.id` 一样。本实战只有一个本地用户，没有加。
 
 ## 自动埋点和手工埋点
 
@@ -354,6 +390,8 @@ uv run --group observability python labs/01-mini-coding-agent/server.py --lab 06
 1. **只读解释**：得到和本章截图类似的 Trace，对照着认一遍每一层。
 2. **定位并修复**：会多出 `edit` 和验证命令的 `agent.tool`。看看授权等待让工具 Span 变长了多少。
 3. **故意失败**：页面会弹出授权请求，允许后可以在 Phoenix 里找到标红的工具 Span，同时注意根 Span 仍然是 `Unset`。
+
+再试一次多轮对话：不点重置，接着追问两三句，然后去 Sessions 标签页找到这段对话，看看每轮的输入 token 怎么变化。点“重置”后再问，会出现一个新的 Session。
 
 每次运行的轮数、内容和耗时都会不同，这很正常。
 

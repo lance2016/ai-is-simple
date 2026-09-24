@@ -122,6 +122,8 @@ class AgentSession:
         )
         self._lock = threading.Lock()
         self._running = False
+        # 一段多轮对话一个编号：每轮仍是单独的 Trace，靠它在 Phoenix 里归到同一个 Session。
+        self.conversation_id = str(uuid.uuid4())
         # 第一条事件带上工作区路径、挂了哪些扩展、有哪些示例任务，页面一连上就知道自己在哪个实战里。
         self.events.publish({
             "type": "ready",
@@ -154,7 +156,7 @@ class AgentSession:
             else:
                 # The background thread carries one active trace context through
                 # model calls, tool execution, and any permission wait.
-                with self.observer.agent_run(prompt):
+                with self.observer.agent_run(prompt, session_id=self.conversation_id):
                     self.agent.run(prompt)
         except Exception as exc:
             # 异常也要出现在时间线上，不然页面只会一直显示"运行中"。
@@ -177,6 +179,8 @@ class AgentSession:
             if self._running:
                 return False
         self.agent.reset()
+        # 清空上下文就是开始一段新对话，换一个新的会话编号。
+        self.conversation_id = str(uuid.uuid4())
         self.events.publish({"type": "reset"})
         return True
 

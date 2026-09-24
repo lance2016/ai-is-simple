@@ -8,7 +8,7 @@ from __future__ import annotations
 import json
 import logging
 import os
-from contextlib import contextmanager
+from contextlib import contextmanager, nullcontext
 from typing import Any, Iterator
 
 logger = logging.getLogger(__name__)
@@ -61,12 +61,18 @@ class PhoenixTraceObserver:
         self._warned = False
 
     @contextmanager
-    def agent_run(self, prompt: str) -> Iterator[None]:
-        """让一次用户请求保持为当前上下文，使自动生成的模型 Span 成为它的子项。"""
+    def agent_run(self, prompt: str, session_id: str = "") -> Iterator[None]:
+        """让一次用户请求保持为当前上下文，使自动生成的模型 Span 成为它的子项。
+
+        传入 session_id 时，同一段多轮对话的每条 Trace 都带上相同的 session.id，
+        Phoenix 会把它们归到同一个 Session。
+        """
         attributes = {
             "openinference.span.kind": "AGENT",
             "input.value": _bounded(prompt),
         }
+        if session_id:
+            attributes["session.id"] = session_id
         try:
             context = self.tracer.start_as_current_span("agent.run", attributes=attributes)
             span = context.__enter__()
@@ -78,7 +84,9 @@ class PhoenixTraceObserver:
         self._run_span = span
         self._turn_index = 0
         try:
-            yield
+            # using_session puts session.id into the context so auto-instrumented LLM spans carry it too.
+            with _session_context(session_id):
+                yield
         except Exception as exc:
             try:
                 _mark_error(span, str(exc))
@@ -176,6 +184,14 @@ class PhoenixTraceObserver:
         if not self._warned:
             logger.warning(message, exc_info=True)
             self._warned = True
+
+
+def _session_context(session_id: str) -> Any:
+    if not session_id:
+        return nullcontext()
+    from openinference.instrumentation import using_session
+
+    return using_session(session_id)
 
 
 def _bounded(value: Any) -> str:
