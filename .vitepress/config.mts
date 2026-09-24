@@ -97,6 +97,8 @@ export default defineConfig({
           { text: 'Lab 04 · 接真实 MCP', link: '/labs/04-mcp/' },
           { text: 'Lab 05 · 修到测试通过', link: '/labs/05-verify/' },
           { text: 'Lab 06 · 看见 Agent 的运行轨迹', link: '/labs/06-observability/' },
+          { text: 'Lab 07 · 给上下文腾出空间', link: '/labs/07-context-management/' },
+          { text: 'Lab 08 · 用案例衡量质量', link: '/labs/08-evaluation/' },
         ],
       },
     ],

@@ -211,6 +211,8 @@ uv run python labs/01-mini-coding-agent/server.py --lab 05 --ext subagent
 | [04 · 接真实 MCP](../04-mcp/) | `mcp` | `tools`、`system_prompt` | 14 MCP、03 Permission |
 | [05 · 修到测试通过](../05-verify/) | `verify` | `system_prompt`、`on_stop` | 17 Goal Loop、04 Hooks |
 | [06 · 看见 Agent 的运行轨迹](../06-observability/) | `observability` | 复用现有事件流接入 Phoenix，不增加 Extension 挂载点 | 01 Agent Loop、02 Tool Use、15 Agent Harness |
+| [07 · 给上下文腾出空间](../07-context-management/) | `context` | 任务结束后压缩旧历史，保留当前任务 | 08 Context Compact、04 Hooks |
+| [08 · 用案例衡量质量](../08-evaluation/) | `evaluation` | 用固定案例和 on_stop 评分器标注行为；离线实验比较版本 | 01 Agent Loop、15 Agent Harness |
 
 挂载点刻意只有三个。权限不单独做挂载点，仍然由每个工具自己的 `confirm_prompt` 决定。扩展加进来的工具，走的也是 `_execute()` 这个唯一入口和同一套授权。
 
@@ -224,7 +226,7 @@ uv run python labs/01-mini-coding-agent/server.py --lab 05 --ext subagent
 | Hooks | `Extension` 的三个挂载点。`on_stop` 就是第 04 章的 `Stop` 节点 |
 | Harness | `CodingAgent + Workspace + AgentSession` |
 
-上下文只是 `CodingAgent.messages` 这个列表，本实战没有做压缩（第 08 章）。
+上下文只是 `CodingAgent.messages` 这个列表；Lab 01 基线不做压缩。Lab 07 展示如何在任务结束后整理旧历史，不修改这个循环。
 
 最值得注意的一点：模型从头到尾没有直接读过文件，也没有直接执行过命令。它只能提出 Tool Call，真正动手的是 `Tool.run()`，而动手之前还要过 `Workspace` 和授权这两关。
 

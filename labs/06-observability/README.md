@@ -90,13 +90,90 @@ uv run --group observability python labs/01-mini-coding-agent/server.py --lab 06
 
 *实战页面示例：左侧 Trace 树串起 Agent、模型和工具步骤；右侧显示当前选中模型 Span 的输出。每次运行产生的内容和耗时会不同。*
 
-本实战会把模型请求中的提示词和回复，以及工具参数和返回值发到本机 Phoenix。工具内容超过 8000 个字符时会截断。示例默认使用单独的 `demo/` 工作区；查看真实项目轨迹时，先确认这些内容适合保存在本机数据库中。
+## Trace 是怎样记录到 Phoenix 的
 
-## 代码里值得看的两处
+数据经过三步：先在创建 OpenAI 客户端前安装自动追踪；每次用户请求创建一个父 Trace；再把 Agent 已有的模型和工具事件变成子 Span。OpenTelemetry SDK 会把这些 Span 发到本机运行的 Phoenix。
 
-**1. 自动追踪模型请求。** Lab 06 在创建 Agent 客户端之前注册 Phoenix 的 OpenAI SDK 自动追踪。项目使用 OpenAI Python SDK 调用 DeepSeek，因此能沿用这层接入；模型提供方是否返回 token 用量等字段，要看它的兼容实现。
+~~~text
+OpenAI SDK 请求 ──自动追踪──┐
+                            ├─ agent.run Trace ── OTLP ──> Phoenix
+Agent 的 tool_call/result ──事件桥──┘
+~~~
 
-**2. 手工补上工具 Span。** Phoenix 能自动看到 SDK 请求，但它看不到本项目如何执行自定义 `read / write / edit / bash`。`AgentSession` 已经收到 `tool_call` 和 `tool_result` 事件，于是把它们包成 `agent.tool` Span；权限等待时间也落在这段执行耗时里。它只观察事件，不改变工具的路径限制或授权判断。
+### 1. 注册 OpenAI SDK 自动追踪
+
+Lab 扩展加载时先调用注册函数。因为它发生在 Agent 客户端创建之前，后续通过 OpenAI Python SDK 发出的请求才能被自动捕获。DeepSeek 提供 OpenAI 兼容接口，因此可以复用这个集成。
+
+扩展入口先启用 Phoenix，再创建扩展实例：
+
+~~~python
+def create(workspace: Workspace) -> Extension:
+    enable_phoenix()
+    return ObservabilityExtension()
+~~~
+
+~~~python
+import os
+from phoenix.otel import register
+
+os.environ.setdefault("PHOENIX_COLLECTOR_ENDPOINT", "http://127.0.0.1:6006")
+provider = register(
+    project_name="ai-is-simple-lab-06",
+    auto_instrument=True,
+    batch=False,
+)
+tracer = provider.get_tracer("ai-is-simple.lab06")
+~~~
+
+完整代码在 labs/01-mini-coding-agent/observability.py 的 enable_phoenix()。接收地址由 PHOENIX_COLLECTOR_ENDPOINT 指定；Docker Compose 将 Phoenix 的接收端口发布到本机。项目名决定 Trace 出现在哪个 Phoenix 项目中。
+
+### 2. 给一次用户请求创建父 Trace
+
+SDK 自动追踪只能看到模型请求，不能知道一整次 Agent 任务从哪里开始、何时结束。网页后端在现有 Agent 调用外包一层上下文：
+
+~~~python
+with self.observer.agent_run(prompt):
+    self.agent.run(prompt)
+~~~
+
+agent_run() 内部使用 start_as_current_span("agent.run")。当前 Span 会成为父节点，所以其中发生的模型调用能自动挂到这条 Trace 下。这里不改 Agent Loop，也不改变网页事件流。
+
+### 3. 把自定义工具事件补成 Span
+
+本项目的 read / write / edit / bash 不是 OpenAI SDK 工具，自动追踪看不到它们的实际执行。Agent 已经会发出 tool_call 和 tool_result 事件，Lab 06 直接观察这两类事件：
+
+~~~python
+if event_type == "tool_call":
+    call_id = str(event.get("call_id", ""))
+    attributes = {
+        "openinference.span.kind": "TOOL",
+        "tool.name": str(event.get("name", "unknown")),
+        "input.value": _bounded(event.get("arguments", {})),
+        "input.mime_type": "application/json",
+    }
+    self._tool_contexts[call_id] = self._start_span("agent.tool", attributes)
+elif event_type == "tool_result":
+    context_and_span = self._tool_contexts.pop(str(event.get("call_id", "")), None)
+    if context_and_span is None:
+        return
+    context, span = context_and_span
+    result = str(event.get("content", ""))
+    span.set_attribute("output.value", _bounded(result))
+    self._safe_close(context)
+~~~
+
+实际实现还会截断过长内容、标记错误和权限拒绝，并在任务结束时关闭未完成的 Span。它只观察事件，不参与路径限制或授权判断。完整逻辑见同一个文件的 PhoenixTraceObserver.on_event()。
+
+### 4. 在 Phoenix 中核对字段
+
+打开刚产生的 Trace，检查：
+
+- agent.run 的输入是用户任务，输出是 Agent 最终回复。
+- agent.model_turn 表示一次模型回合；OpenAI SDK 集成会在它下面记录模型请求。
+- agent.tool 的 tool.name、input.value、output.value 分别说明工具名称、参数和结果。
+- Span 的时间线能看出模型等待、工具执行和网页授权等待各占了多久。
+
+本实战会把模型提示词、模型回复、工具参数和工具返回值发到本机 Phoenix。工具内容超过 8000 个字符时会截断。示例默认使用单独的 demo/ 工作区；查看真实项目轨迹前，先确认这些内容适合发送到你的本机 Phoenix 数据库。模型请求仍会发送到配置的 DeepSeek API。
 
 ## 今天只记住
 

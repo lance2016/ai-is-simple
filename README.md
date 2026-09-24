@@ -125,6 +125,8 @@
 
 实战篇和理论篇一样，也是 **主干 + 按需挂上的能力**：Lab 01 是主干；后面每个实战写一个扩展，挂到同一个 Agent 上，Agent Loop 一行不改。
 
+推荐路线按能力逐步展开到 Lab 08；这是一条学习路线，02～08 仍可按场景选择。
+
 | 状态 | 实战 | 核心内容 | 对应理论篇 |
 | --- | --- | --- | --- |
 | ✅ | [01 · Mini Coding Agent](./labs/01-mini-coding-agent/) | 用 Python + DeepSeek 实现 `read / write / edit / bash` 四个工具，配一个网页界面：流式输出、逐步展示 tool call、改动前等你授权；留好三个扩展挂载点 | 01～04、15 |
@@ -133,12 +135,14 @@
 | ✅ | [04 · 接真实 MCP](./labs/04-mcp/) | 手写 stdio MCP Server 和客户端，远程工具和本地工具走同一套授权 | 14、03 |
 | ✅ | [05 · 修到测试通过](./labs/05-verify/) | 模型想结束时由程序跑测试，没过就把失败输出送回循环 | 17、04 |
 | ✅ | [06 · 看见 Agent 的运行轨迹](./labs/06-observability/) | 用 Phoenix 和 OpenTelemetry 串起一次任务里的模型请求、工具调用、耗时与错误 | 01、02、15 |
+| ✅ | [07 · 给上下文腾出空间](./labs/07-context-management/) | 在任务结束后压缩旧对话，保留当前任务和关键信息 | 08、04 |
+| ✅ | [08 · 用案例衡量质量](./labs/08-evaluation/) | 用固定数据集和评分器比较 Agent 版本，并回到 Trace 定位失败 | 01、15 |
 | 📖 | Pi 扩展阅读 | 理解 TypeScript/Node.js Harness 如何通过 Extension、Skill、Session 和 SDK 扩展 | — |
 
 想看哪个实战，一条命令启动，页面上会列出这个实战的示例任务，点一下就能用：
 
 ```bash
-uv run python labs/01-mini-coding-agent/server.py --lab 05   # 换成 02 / 03 / 04 / 05 / 06
+uv run python labs/01-mini-coding-agent/server.py --lab 05   # 换成 02 / 03 / 04 / 05 / 06 / 07 / 08
 ```
 
 想同时挂多个能力，再加 `--ext`，例如 `--lab 05 --ext subagent`。
@@ -281,7 +285,10 @@ ai-is-simple/
 │   ├── chapter-15-integrated-harness.png
 │   ├── chapter-16-workflow-runtime.png
 │   ├── chapter-17-goal-loop.png
-│   └── lab-01-mini-coding-agent.png
+│   ├── lab-01-mini-coding-agent.png
+│   ├── lab-06-observability.png
+│   ├── lab-07-context-management.png
+│   └── lab-08-evaluation.png
 ├── pyproject.toml
 ├── uv.lock
 ├── .env.example
@@ -352,7 +359,9 @@ ai-is-simple/
     ├── 03-subagent/
     ├── 04-mcp/           # 另有 notes_server.py 和 notes/
     ├── 05-verify/
-    └── 06-observability/ # Phoenix Compose 配置、演示工作区和实战截图
+    ├── 06-observability/ # Phoenix Compose 配置、演示工作区和实战截图
+    ├── 07-context-management/ # 上下文预算与对话压缩
+    └── 08-evaluation/ # Phoenix 固定案例集与实验评分
 ```
 
 每个章节都是一个独立的小单元：
@@ -372,6 +381,13 @@ ai-is-simple/
 - `.env` 管理本地配置
 
 重点不是某个模型或框架，而是理解 **Agent 背后的通用机制**。
+
+Phoenix 相关依赖放在独立的 uv 依赖组里，基础实战不需要安装它们：
+
+- Lab 06 使用 observability 依赖组，运行 uv sync --group observability。
+- Lab 08 再加 evaluation 依赖组，运行 uv sync --group observability --group evaluation。
+
+具体运行步骤见各自的 README；所有依赖版本都记录在 uv.lock 锁文件中。
 
 ---
 
