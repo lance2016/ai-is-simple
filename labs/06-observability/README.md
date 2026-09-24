@@ -11,6 +11,7 @@
 ## 先看图
 
 - `Project`（项目）是一本工单簿，装着同一个应用产生的所有 Trace。
+- `Session`（会话）是一位客户的所有工单，把同一段多轮对话里的 Trace 串起来。
 - `Trace`（轨迹）是一张工单，代表用户交给 Agent 的**一次任务**。
 - `Span`（片段）是工单上的一步，记录这一步的输入、输出、耗时和成败。
 - Span 之间有父子关系：父 Span 包住子 Span，整张工单就长成一棵树。
@@ -29,13 +30,15 @@
 2. **项目卡片 `ai-is-simple-lab-06`**：项目名来自代码里的 `project_name`。同一个应用的 Trace 都进这个项目。
 3. **Traces**：这个项目里有多少条 Trace。这里是 1，说明只跑了一次任务。
 4. **Latency P50**：一半任务在这个时间内完成。只有一条 Trace 时，它就是那条 Trace 的总耗时 7.1 秒。
-5. **`default` 项目**：没指定项目名时，Trace 会落到这里。如果你在自己的项目里找不到轨迹，先来这里看看。
+5. **Sessions**：有多少段多轮对话。本实战没有给 Trace 标会话编号，所以是 0，后面“多轮对话”一节会讲怎么补上。
+6. **`default` 项目**：没指定项目名时，Trace 会落到这里。如果你在自己的项目里找不到轨迹，先来这里看看。
 
 四个概念的关系可以对照这张表：
 
 | 概念 | 一句话 | 本实战里对应什么 |
 | --- | --- | --- |
 | Project | 一类应用的所有记录 | `ai-is-simple-lab-06` |
+| Session | 一段多轮对话 | 从打开页面到点“重置”之间的所有提问 |
 | Trace | 一次完整任务 | 网页上提交一次问题 |
 | Span | 任务里的一步 | 一次模型请求、一次工具执行 |
 | 父子 Span | 大步骤包住小步骤 | `agent.run` 包住模型回合和工具 |
@@ -136,6 +139,48 @@ agent.run                           ← 用户任务（根 Span）
 2. **哪一步慢？** 先看 Trace 总耗时，再挨个点 Span 比较 Duration。模型慢，看 token 数是不是太大；工具慢，看是命令本身慢还是在等授权。
 3. **哪一步错？** 找标红的 Span，看它的 Status 描述和 Output。第三个示例任务会故意跑一条抛异常的命令，可以在对应的 `agent.tool` 上看到 `Error` 和 `tool.outcome=error`。
 4. **为什么有这么多 Span？** 数一数轮数和工具次数，套上面的公式。多出来的 Span 通常说明 Agent 绕了弯路：同一个文件读了好几遍，或者一个命令反复重试。
+
+## 多轮对话：一轮一条 Trace，用 Session 串起来
+
+网页上连续问好几个问题，Agent 会记住前面的对话。那这几轮应该放进同一条 Trace，还是各开一条？
+
+**答案是每轮单独一条 Trace，再用 Session 把它们串起来。**
+
+### 为什么不放进同一条 Trace
+
+- **Trace 要有明确的起点和终点。** 一轮提问从用户发消息开始，到 Agent 给出回答结束。一段对话却可能断断续续聊好几个小时，根 Span 一直关不上，总耗时也就没法算。
+- **统计会失真。** 项目卡片上的 Latency P50 是按 Trace 算的。把用户思考、喝咖啡的时间也算进去，这个数字就没有意义了。
+- **树会越长越大。** 聊十轮就是几十上百个 Span 挤在一棵树里，想找第 7 轮哪一步出错会很费劲。
+- **问题要能单独定位。** 第 3 轮出错、第 5 轮变慢，最好各自是一条完整的记录，可以单独打开、单独分享。
+
+本实战的代码就是这样做的：每次提交问题都会进入一次新的 `agent.run`，所以每轮都是一条新 Trace。
+
+### 用 Session 关联
+
+Phoenix 遵循 OpenInference 的约定：给 Span 加上同一个 `session.id` 属性，这些 Trace 就会归到同一个 Session 下面。在项目的 `Sessions` 标签页里，它们会按时间排成一段聊天记录，每轮的输入输出、耗时和 token 都能对照着看。
+
+做法是在对话开始时生成一个会话编号，之后每轮都带上它：
+
+~~~python
+import uuid
+from openinference.instrumentation import using_session
+
+conversation_id = str(uuid.uuid4())  # 重置对话时换一个新的
+
+with using_session(conversation_id):
+    with self.observer.agent_run(prompt):
+        self.agent.run(prompt)
+~~~
+
+`using_session()` 把会话编号放进当前上下文，里面自动产生的模型 Span 都会带上 `session.id`。手工创建的 `agent.run` 最稳妥的做法是也在属性里显式写上 `session.id`。
+
+**注意：本实战的代码还没有做这一步**，所以截图里 Sessions 是 0。多轮对话照样能跑，只是 Phoenix 里看到的是几条互不关联的 Trace。
+
+### 多轮对话里的 Trace 要怎么读
+
+- **看 token 有没有逐轮上涨。** 第二轮的第一次模型请求，输入里已经包含第一轮的全部对话和工具结果。所以后面几轮就算问题很简单，token 也可能很大。
+- **答案和前面对不上时，看 Input。** 打开这一轮的 `ChatCompletion`，检查模型拿到的历史消息里有没有你以为它记得的内容。
+- **同一个用户的多段对话**，可以再加一个 `user.id`，用法和 `session.id` 一样。
 
 ## 自动埋点和手工埋点
 
