@@ -2,7 +2,7 @@
 
 ![Agent Harness：多个能力挂在同一个循环上](../../assets/chapter-15-integrated-harness.png)
 
-> **一句话总结：Harness 不是替模型思考，而是把工具、权限、记忆、任务和 MCP 组织成一个可运行的环境。**
+> **一句话总结：Harness（Agent 的运行环境）把工具、权限、记忆、任务和 MCP 接到同一个循环里。**
 
 前面的章节分别讲了很多零件。本章把它们放回同一辆车里：模型负责决定，Harness 负责提供能力、边界和结果。
 

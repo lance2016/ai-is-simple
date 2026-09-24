@@ -4,7 +4,7 @@
 
 > **一句话总结：大模型不会自动知道你的应用发生了什么，它只会根据这一次请求提供给它的上下文生成下一条回复。**
 
-在学习 Agent Loop、Tool Calling 和 MCP 之前，先把最普通的一次模型调用看懂。
+Chat Completion（聊天补全）就是把一组消息发给模型，请它生成下一条回复。开始看 Agent 如何使用工具之前，先理解这次普通请求。
 
 很多复杂的 Agent，最后都建立在这个简单结构上：
 
@@ -15,7 +15,7 @@
    ↓
 调用模型
    ↓
-得到 assistant message
+得到 assistant message（模型回复）
 ```
 
 ## 1. 先看最简单的一次请求
@@ -23,10 +23,13 @@
 使用 OpenAI Python SDK 风格调用 DeepSeek：
 
 ```python
+import os
+from dotenv import load_dotenv
 from openai import OpenAI
 
+load_dotenv()
 client = OpenAI(
-    api_key="你的_api_key",
+    api_key=os.environ["DEEPSEEK_API_KEY"],
     base_url="https://api.deepseek.com",
 )
 
@@ -63,14 +66,12 @@ assistant message
 
 最常见的角色可以先这样理解：
 
-| `role` | 可以先理解成 |
+| `role`（消息角色） | 可以先理解成 |
 | --- | --- |
 | `system` | 给模型的总体规则和身份 |
 | `user` | 用户说的话 |
 | `assistant` | 模型之前说过的话 |
 | `tool` | 工具执行后返回给模型的结果 |
-
-不同模型服务和 API 的角色设计可能略有区别。本项目先用 Chat Completions 中最容易理解的形式建立心智模型。
 
 ## 3. 模型没有自动记住上一轮
 
@@ -145,151 +146,13 @@ messages = [
 | 返回内容 | 程序下一步 | 适合的场景 |
 | --- | --- | --- |
 | `assistant.content` | 直接展示或继续处理文本 | 普通解释、改写、总结 |
-| `assistant.tool_calls` | 程序执行工具，把 `role="tool"` 结果追加后再次请求 | 需要读文件、查日期、写入外部系统 |
+| `assistant.tool_calls`（工具调用请求） | 程序执行工具，把 `role="tool"` 结果追加后再次请求 | 需要读文件、查日期、写入外部系统 |
 
 `tools` 只是“可选能力说明”，不是每次都必须调用。模型可以选择直接回答；即使模型提出了 `tool_call`，也只是提出请求，真正执行仍由程序决定。
 
-## 5. Tool Calling 也是一次模型请求
+## 下一章会发生什么
 
-普通请求：
-
-```python
-response = client.chat.completions.create(
-    model=MODEL,
-    messages=messages,
-)
-```
-
-加入工具描述后：
-
-```python
-response = client.chat.completions.create(
-    model=MODEL,
-    messages=messages,
-    tools=tools,
-)
-```
-
-`tools` 是在告诉模型：
-
-> “除了直接回答问题之外，你还可以选择这些工具。”
-
-工具描述里通常会包含：
-
-```text
-工具名称
-工具作用
-参数结构
-```
-
-模型可能返回：
-
-```text
-我要调用 read_file
-参数：path = README.md
-```
-
-但必须分清：
-
-> **模型选择工具，不等于模型执行工具。**
-
-模型只是生成了一个 `tool_call`。真正执行 `read_file("README.md")` 的，是你的 Python 程序。
-
-## 6. 工具结果怎么回到模型
-
-工具执行完成后，程序会把结果变成一条新的上下文：
-
-```python
-messages.append({
-    "role": "tool",
-    "tool_call_id": tool_call.id,
-    "content": result,
-})
-```
-
-然后再次请求模型：
-
-```python
-response = client.chat.completions.create(
-    model=MODEL,
-    messages=messages,
-    tools=tools,
-)
-```
-
-工具结果并不是神秘地“进入模型”。程序只是把它加入 `messages`，再调用一次模型：
-
-```text
-模型选择工具
-      ↓
-程序执行工具
-      ↓
-得到结果
-      ↓
-结果加入 messages
-      ↓
-再次请求模型
-```
-
-到这里先停下。下一章会把这个过程真正放进一个循环里，那就是最小 Agent Loop。
-
-## 7. API Request 不等于模型真的在“读 JSON”
-
-开发者看到的是这样的 API 表达形式：
-
-```python
-{"role": "user", "content": "你好"}
-```
-
-可以简单理解真实链路为：
-
-```text
-Python 数据结构
-      ↓
-API Request
-      ↓
-模型服务处理
-      ↓
-Token / Model Context
-      ↓
-模型生成结果
-```
-
-我们说“模型看到 `messages`”，是为了方便理解。模型本身并不是像程序员一样阅读 JSON。
-
-## 8. 这和 Agent 有什么关系
-
-普通 Chat Completion：
-
-```text
-上下文
-  ↓
-模型
-  ↓
-答案
-```
-
-升级成 Agent：
-
-```text
-上下文
-  ↓
-模型决定下一步
-  ↓
-需要工具？
-  ↓
-程序执行
-  ↓
-结果加入上下文
-  ↓
-再次请求模型
-```
-
-因此可以得出：
-
-> **Agent 并没有改变大模型最基础的调用方式，它只是在模型外面增加了循环、工具和状态管理。**
-
-本章的 `code.py` 只演示普通回答和消息历史；工具调用分支会在第 01、02 章展开。这样每一章只增加一个新概念，不需要一开始就把完整 Agent 全塞进来。
+如果模型返回 `tool_calls`，程序可以执行对应工具，再把结果加入下一次请求。第 01 章会把这个过程放进循环里；本章先记住：程序准备每次请求的上下文，模型根据它返回一条消息。
 
 ## 用 DeepSeek 跑起来
 
@@ -326,11 +189,7 @@ messages.append({"role": "user", "content": "我叫什么名字？"})
 
 ## 今天只记住
 
-> **LLM 不会自动知道你的应用发生过什么，它只知道这一次请求提供给它什么。**
-
-> **一次最基本的调用，就是：构造上下文 → 请求模型 → 得到下一条 assistant message。**
-
-后面的 Tool Calling、Memory、Context、MCP 和 Agent Harness，都是在这个基础之上逐渐增加能力。
+> **每次请求都由程序提供上下文；模型根据这份上下文生成下一条回复。历史消息要由程序再次发送。**
 
 ## 想一想
 
