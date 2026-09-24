@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""实战篇 06：把 Agent 的每一步记下来，出错时方便排查"""
+"""实战篇 06：记录 Agent 的模型和工具调用"""
 
 from __future__ import annotations
 

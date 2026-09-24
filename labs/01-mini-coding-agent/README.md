@@ -1,4 +1,4 @@
-# 实战篇 01：自己搭一个能读项目、改代码的 Agent
+# 实战篇 01：做一个能改代码的 Agent
 
 > **一句话总结：Coding Agent 不神秘，就是「模型循环 + 一组工具 + 一个安全的工作区」，再把每一步摆到浏览器里给你看。**
 
@@ -207,12 +207,12 @@ uv run python labs/01-mini-coding-agent/server.py --lab 05 --ext subagent
 | 实战 | 扩展 | 新增能力 | 对应理论篇 |
 |---|---|---|---|
 | [02 · 让 Agent 记住项目规则](../02-memory/) | `memory` | `system_prompt` | 07 Skill Loading、09 Memory |
-| [03 · 让子 Agent 帮忙调查项目](../03-subagent/) | `subagent` | `tools` | 06 Subagents |
+| [03 · 让子 Agent 帮忙查项目](../03-subagent/) | `subagent` | `tools` | 06 Subagents |
 | [04 · 用 MCP 让 Agent 读写笔记](../04-mcp/) | `mcp` | `tools`、`system_prompt` | 14 MCP、03 Permission |
-| [05 · 测试没过，让 Agent 接着修代码](../05-verify/) | `verify` | `system_prompt`、`on_stop` | 17 Goal Loop、04 Hooks |
-| [06 · 把 Agent 的每一步记下来，出错时方便排查](../06-observability/) | `observability` | 复用现有事件流接入 Phoenix，不增加 Extension 挂载点 | 01 Agent Loop、02 Tool Use、15 Agent Harness |
-| [07 · 把旧对话整理成摘要，让 Agent 接着工作](../07-context-management/) | `context` | 任务结束后压缩旧历史，保留当前任务 | 08 Context Compact、04 Hooks |
-| [08 · 改了 Agent 之后，怎样知道效果有没有变好？](../08-evaluation/) | `evaluation` | 用固定案例和 on_stop 评分器标注行为；离线实验比较版本 | 01 Agent Loop、15 Agent Harness |
+| [05 · 测试没过，让 Agent 接着修](../05-verify/) | `verify` | `system_prompt`、`on_stop` | 17 Goal Loop、04 Hooks |
+| [06 · 记录 Agent 的模型和工具调用](../06-observability/) | `observability` | 复用现有事件流接入 Phoenix，不增加 Extension 挂载点 | 01 Agent Loop、02 Tool Use、15 Agent Harness |
+| [07 · 压缩旧对话，保留当前任务](../07-context-management/) | `context` | 任务结束后压缩旧历史，保留当前任务 | 08 Context Compact、04 Hooks |
+| [08 · 用固定案例比较 Agent 版本](../08-evaluation/) | `evaluation` | 用固定案例和 on_stop 评分器标注行为；离线实验比较版本 | 01 Agent Loop、15 Agent Harness |
 
 挂载点刻意只有三个。权限不单独做挂载点，仍然由每个工具自己的 `confirm_prompt` 决定。扩展加进来的工具，走的也是 `_execute()` 这个唯一入口和同一套授权。
 

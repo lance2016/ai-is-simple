@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""实战篇 07：把旧对话整理成摘要，让 Agent 接着工作"""
+"""实战篇 07：压缩旧对话，保留当前任务"""
 
 from __future__ import annotations
 

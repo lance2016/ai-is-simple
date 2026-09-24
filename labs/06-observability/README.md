@@ -1,4 +1,4 @@
-# 实战篇 06：把 Agent 的每一步记下来，出错时方便排查
+# 实战篇 06：记录 Agent 的模型和工具调用
 
 ![Agent 的一次运行如何形成 Trace](../../assets/lab-06-observability.png)
 

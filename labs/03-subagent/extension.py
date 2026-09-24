@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""实战篇 03：让子 Agent 帮忙调查项目
+"""实战篇 03：让子 Agent 帮忙查项目
 
 只加一个工具 task。它背后是另一个 CodingAgent：
   - 有自己的 messages，中间读了什么、跑了什么，都不进主 Agent 的上下文；

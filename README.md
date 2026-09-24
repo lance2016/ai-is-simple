@@ -129,14 +129,14 @@
 
 | 状态 | 实战 | 核心内容 | 对应理论篇 |
 | --- | --- | --- | --- |
-| ✅ | [01 · 自己搭一个能读项目、改代码的 Agent](./labs/01-mini-coding-agent/) | 用 Python + DeepSeek 实现 `read / write / edit / bash` 四个工具，配一个网页界面：流式输出、逐步展示 tool call、改动前等你授权；留好三个扩展挂载点 | 01～04、15 |
+| ✅ | [01 · 做一个能改代码的 Agent](./labs/01-mini-coding-agent/) | 用 Python + DeepSeek 实现 `read / write / edit / bash` 四个工具，配一个网页界面：流式输出、逐步展示 tool call、改动前等你授权；留好三个扩展挂载点 | 01～04、15 |
 | ✅ | [02 · 让 Agent 记住项目规则](./labs/02-memory/) | `.agent/MEMORY.md` 每次带进 system prompt，技能只放目录、用到再读；不加新工具 | 07、09 |
-| ✅ | [03 · 让子 Agent 帮忙调查项目](./labs/03-subagent/) | `task` 工具背后是另一个只读的 `CodingAgent`，只交回总结 | 06 |
+| ✅ | [03 · 让子 Agent 帮忙查项目](./labs/03-subagent/) | `task` 工具背后是另一个只读的 `CodingAgent`，只交回总结 | 06 |
 | ✅ | [04 · 用 MCP 让 Agent 读写笔记](./labs/04-mcp/) | 手写 stdio MCP Server 和客户端，远程工具和本地工具走同一套授权 | 14、03 |
-| ✅ | [05 · 测试没过，让 Agent 接着修代码](./labs/05-verify/) | 模型想结束时由程序跑测试，没过就把失败输出送回循环 | 17、04 |
-| ✅ | [06 · 把 Agent 的每一步记下来，出错时方便排查](./labs/06-observability/) | 用 Phoenix 和 OpenTelemetry 串起一次任务里的模型请求、工具调用、耗时与错误 | 01、02、15 |
-| ✅ | [07 · 把旧对话整理成摘要，让 Agent 接着工作](./labs/07-context-management/) | 在任务结束后压缩旧对话，保留当前任务和关键信息 | 08、04 |
-| ✅ | [08 · 改了 Agent 之后，怎样知道效果有没有变好？](./labs/08-evaluation/) | 用固定数据集和评分器比较 Agent 版本，并回到 Trace 定位失败 | 01、15 |
+| ✅ | [05 · 测试没过，让 Agent 接着修](./labs/05-verify/) | 模型想结束时由程序跑测试，没过就把失败输出送回循环 | 17、04 |
+| ✅ | [06 · 记录 Agent 的模型和工具调用](./labs/06-observability/) | 用 Phoenix 和 OpenTelemetry 串起一次任务里的模型请求、工具调用、耗时与错误 | 01、02、15 |
+| ✅ | [07 · 压缩旧对话，保留当前任务](./labs/07-context-management/) | 在任务结束后压缩旧对话，保留当前任务和关键信息 | 08、04 |
+| ✅ | [08 · 用固定案例比较 Agent 版本](./labs/08-evaluation/) | 用固定数据集和评分器比较 Agent 版本，并回到 Trace 定位失败 | 01、15 |
 | 📖 | Pi 扩展阅读 | 理解 TypeScript/Node.js Harness 如何通过 Extension、Skill、Session 和 SDK 扩展 | — |
 
 想看哪个实战，一条命令启动，页面上会列出这个实战的示例任务，点一下就能用：
