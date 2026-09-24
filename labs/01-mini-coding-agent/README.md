@@ -206,13 +206,13 @@ uv run python labs/01-mini-coding-agent/server.py --lab 05 --ext subagent
 
 | 实战 | 扩展 | 新增能力 | 对应理论篇 |
 |---|---|---|---|
-| [02 · 让 Agent 记住项目规则](../02-memory/) | `memory` | `system_prompt` | 07 Skill Loading、09 Memory |
-| [03 · 让子 Agent 帮忙查项目](../03-subagent/) | `subagent` | `tools` | 06 Subagents |
+| [02 · 给 Agent 加项目记忆](../02-memory/) | `memory` | `system_prompt` | 07 Skill Loading、09 Memory |
+| [03 · 让子 Agent 查代码并汇总](../03-subagent/) | `subagent` | `tools` | 06 Subagents |
 | [04 · 用 MCP 让 Agent 读写笔记](../04-mcp/) | `mcp` | `tools`、`system_prompt` | 14 MCP、03 Permission |
-| [05 · 测试没过，让 Agent 接着修](../05-verify/) | `verify` | `system_prompt`、`on_stop` | 17 Goal Loop、04 Hooks |
+| [05 · 测试失败后，Agent 接着修代码](../05-verify/) | `verify` | `system_prompt`、`on_stop` | 17 Goal Loop、04 Hooks |
 | [06 · 记录 Agent 的模型和工具调用](../06-observability/) | `observability` | 复用现有事件流接入 Phoenix，不增加 Extension 挂载点 | 01 Agent Loop、02 Tool Use、15 Agent Harness |
 | [07 · 压缩旧对话，保留当前任务](../07-context-management/) | `context` | 任务结束后压缩旧历史，保留当前任务 | 08 Context Compact、04 Hooks |
-| [08 · 用固定案例比较 Agent 版本](../08-evaluation/) | `evaluation` | 用固定案例和 on_stop 评分器标注行为；离线实验比较版本 | 01 Agent Loop、15 Agent Harness |
+| [08 · 用同一组任务对比 Agent 版本](../08-evaluation/) | `evaluation` | 用固定案例和 on_stop 评分器标注行为；离线实验比较版本 | 01 Agent Loop、15 Agent Harness |
 
 挂载点刻意只有三个。权限不单独做挂载点，仍然由每个工具自己的 `confirm_prompt` 决定。扩展加进来的工具，走的也是 `_execute()` 这个唯一入口和同一套授权。
 

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""实战篇 08：用固定案例比较 Agent 版本"""
+"""实战篇 08：用同一组任务对比 Agent 版本"""
 
 from __future__ import annotations
 
