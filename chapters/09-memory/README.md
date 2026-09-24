@@ -1,25 +1,26 @@
-# 第 09 章：Memory——短期状态与长期记忆
+# 第 09 章：Memory——会话内记忆与跨会话记忆
 
 ![Memory：筛选并召回持久化信息](../../assets/chapter-09-memory.png)
 
-> **一句话总结：短期记忆维持当前任务的状态，长期记忆把跨任务仍有用的信息保存下来，并在需要时取回。**
+> **一句话总结：会话内记忆让当前任务接得上，跨会话记忆让后续任务用得上过去的信息。**
 
 **本章新增：** 一个最小的长期记忆存储，以及写入、检索和使用记忆的流程。
 
 第 08 章的 Context Compact 处理当前对话太长的问题。Memory 处理的是另一件事：当前会话结束后，哪些信息值得留下，之后又如何找到它。
 
-## 先分清短期和长期
+## 记忆常说几层？
 
-| | 短期记忆 | 长期记忆 |
-| --- | --- | --- |
-| 范围 | 当前会话或任务 | 多个会话、任务或项目阶段 |
-| 内容 | 消息、计划、工具结果、待办状态 | 用户偏好、项目规则、历史决定、过去的经验 |
-| 常见存储 | 当前消息列表、任务状态、可恢复检查点（checkpoint） | 文件、关系数据库、向量库、知识图谱 |
-| 主要问题 | 如何在上下文有限时继续当前任务 | 如何筛选、更新并找回长期有用的信息 |
+行业没有统一的“记忆分层标准”。初学时可以先按信息能用多久、能被哪些任务访问来区分：
 
-会话历史即使写进数据库，仍可能只是某个 thread 的短期状态；它不自动变成可跨会话复用的长期记忆。OpenAI Agents SDK 的 Session 和 LangGraph 的 thread checkpoint 都用于保存会话状态；长期记忆则要另行设计存储范围和召回方式。[OpenAI Agents SDK：Sessions](https://openai.github.io/openai-agents-python/sessions/)、[LangGraph：Memory 概览](https://docs.langchain.com/oss/python/concepts/memory)
+| 范围 | 当前上下文（工作记忆） | 当前会话（短期记忆） | 跨会话（长期记忆） |
+| --- | --- | --- | --- |
+| 能用多久 | 当前这次模型调用 | 同一个对话或任务线程 | 后续对话、任务或运行 |
+| 典型内容 | 这一步要用的消息、文件片段和召回结果 | 对话历史、工具结果、计划和待办状态 | 用户偏好、项目规则、历史经验和决定 |
+| 常见实现 | 放进模型的 context | Session、thread state、checkpoint | Store、文件、数据库、向量库或知识图谱 |
 
-Context Compact 会整理当前会话的历史，保留进行中的任务所需内容。长期 Memory 则把筛选后的信息放到会话之外。两者可以配合使用，不能互相替代。
+**“跨会话”通常描述记忆的作用范围，不是和“短期、长期”并列的固定第三类。** 很多框架把同一个 thread 内可恢复的状态称为短期记忆，把跨 thread 可检索的信息称为长期记忆。会话历史即使写入数据库、服务重启后仍存在，只要它仍只属于原来的 thread，在这套分类里依然是短期记忆。要看清框架里的“session”具体指什么：有的指一次聊天，有的指一次运行。
+
+模型每次只看得到当前上下文。短期历史和长期记忆都要经过选择，才会进入当前上下文；Context Compact 整理的是当前对话历史，Memory 则管理会话之外可复用的信息。LangGraph 明确把 checkpointer 用于 thread 状态、store 用于跨 thread 数据；OpenAI Agents SDK 也把保存消息的 Session 和供后续运行使用的 Agent Memory 分开。[LangGraph：Persistence](https://docs.langchain.com/oss/python/langgraph/persistence)、[OpenAI Agents SDK：Sessions](https://openai.github.io/openai-agents-python/sessions/)、[OpenAI Agents SDK：Agent Memory](https://openai.github.io/openai-agents-python/sandbox/memory/)
 
 ## 长期记忆保存什么
 
@@ -63,16 +64,27 @@ Context Compact 会整理当前会话的历史，保留进行中的任务所需�
 
 读取时先按用户、项目或团队等范围隔离，再根据当前任务检索。常见做法包括关键词检索、向量语义检索、实体关系检索，或把几种信号合并排序。最后只把有限的证据交给模型，并保留来源，方便核对。
 
+## 常见记忆框架
+
+截至 **2026 年 9 月**，比较常见的项目横跨两类：直接提供记忆存取能力的框架，以及自带记忆机制的 Agent 框架。GitHub 星数可以粗略反映关注度，但不等于实际部署量。
+
+| 项目 | 它主要提供什么 | 适合什么情况 |
+| --- | --- | --- |
+| [Mem0](https://github.com/mem0ai/mem0) | 可单独接入的记忆层，负责提取、保存和检索用户或项目记忆 | 想给现有 Agent 增加跨会话记忆 |
+| [LangGraph](https://github.com/langchain-ai/langgraph) | Agent 编排框架；checkpointer 保存当前 thread，store 保存跨 thread 信息 | 已用 LangGraph，需要自己组合短期状态和长期存储 |
+| [Graphiti / Zep](https://github.com/getzep/graphiti) | 保存带来源和有效时间的实体、关系与事件 | 事实关系多、状态常变化，还要追溯过去 |
+| [Cognee](https://github.com/topoteretes/cognee) | 把文档、代码和对话整理成可查询的知识图谱 | 要把多个来源汇成项目或团队知识库 |
+| [Hindsight](https://github.com/vectorize-io/hindsight) | 分开组织事实、经历、观察结论和心智模型，并提供 retain / recall / reflect 流程 | 希望 Agent 能从多次经验中归纳规律 |
+| [Letta Code](https://github.com/letta-ai/letta-code) | 完整的持久化 Agent Harness；MemFS 用可版本管理的文件组织常驻记忆和按需材料 | 想研究 Agent 如何自行维护上下文和长期记忆 |
+| [OpenAI Agents SDK](https://openai.github.io/openai-agents-python/) | Session 保存对话历史；Sandbox Agent 的 Memory 能为后续运行整理经验，仍处于 Beta | 已采用该 SDK，想先用它提供的会话和沙箱记忆能力 |
+
+这些项目解决的问题不同，不能只按“谁的记忆最好”排成一个榜单。Mem0 更像可嵌入的记忆服务；LangGraph 给应用状态和存储的接口；Letta 把记忆做成 Agent 本身的一部分。尤其要注意：**Mem0 的实体匹配不等于完整知识图谱。** 当前开源检索依赖配置的向量库，可选重排，并用实体重合提升排序；Graphiti 才是专门维护可查询时序关系图的路线。[Mem0 开源架构说明](https://github.com/mem0ai/mem0/blob/main/docs/core-concepts/how-it-works.mdx)、[Graphiti 官方说明](https://github.com/getzep/graphiti)
+
 ## 近期系统走向
 
-截至 **2026 年 9 月**，没有一种架构在所有记忆任务上都占优。下面几种路线解决的问题不同：
+不同路线仍在演进，主要变化集中在提取、时间理解、后台整理和检索策略：
 
-| 路线 | 代表做法 | 适合关注的问题 |
-| --- | --- | --- |
-| 事实提取与混合检索 | Mem0 从交互中提取记忆，再结合语义、关键词和实体信号召回 | 记什么、如何避免漏召回 |
-| 时间知识图谱 | Graphiti/Zep 连接实体、事件和事实，并记录事实何时生效或失效 | 关系复杂、状态会变化、需要追溯历史 |
-| 记忆生命周期管理 | MemOS 把记忆视为可分层、调度和治理的资源 | 多种存储、多个 Agent、共享与审计 |
-| 按问题组织证据 | LeanMem 等研究根据问题动态选择记忆类型和检索预算 | 如何用更少上下文回答不同问题 |
+MemOS 探索把不同类型的记忆、生命周期和调度放进统一的管理层；LeanMem 研究如何根据问题选择记忆类型和检索预算。它们代表系统架构与检索策略的探索，不是和 Mem0 一样的同类 SDK。[MemOS](https://github.com/MemTensor/MemOS/blob/main/docs/en/open_source/home/memos_intro.md)、[LeanMem（2026 预印本）](https://arxiv.org/abs/2608.03463)
 
 Mem0 的 2026 更新体现了几项变化：抽取阶段用一次模型调用添加独立事实，让新旧状态都能留下；检索融合语义、关键词和实体匹配；时间感知区分事实何时成立，并按问题调整排序。Memory Decay 还会根据记忆最近被使用的时间轻调排序，但不会删除旧记忆。后台 Dream 则能合并重复项、标记已被取代的事实，并归纳多条记录；它目前属于 Pro 和 Enterprise 计划，不是开源 SDK 默认具备的能力。[Mem0：Token-Efficient Memory Algorithm](https://mem0.ai/blog/mem0-the-token-efficient-memory-algorithm)、[Mem0：Temporal Reasoning](https://mem0.ai/blog/introducing-temporal-reasoning-in-mem0)、[Mem0：Memory Decay](https://mem0.ai/blog/introducing-memory-decay-in-mem0)、[Mem0：Dream](https://mem0.ai/blog/dream-background-memory-consolidation-for-ai-agents)
 
@@ -129,8 +141,14 @@ uv run python chapters/09-memory/code.py
 ## 参考
 
 - [LangGraph：Memory 概览](https://docs.langchain.com/oss/python/concepts/memory)
+- [LangGraph：Persistence](https://docs.langchain.com/oss/python/langgraph/persistence)
 - [LangGraph：短期记忆](https://docs.langchain.com/oss/python/langchain/short-term-memory)
 - [LangGraph：长期记忆](https://docs.langchain.com/oss/python/langchain/long-term-memory)
+- [OpenAI Agents SDK：Agent Memory](https://openai.github.io/openai-agents-python/sandbox/memory/)
+- [Mem0：开源架构说明](https://github.com/mem0ai/mem0/blob/main/docs/core-concepts/how-it-works.mdx)
+- [Cognee：官方仓库](https://github.com/topoteretes/cognee)
+- [Hindsight：官方仓库](https://github.com/vectorize-io/hindsight)
+- [Letta Code：官方仓库](https://github.com/letta-ai/letta-code)
 - [Mem0：Token-Efficient Memory Algorithm](https://mem0.ai/blog/mem0-the-token-efficient-memory-algorithm)
 - [Mem0：Memory Decay](https://mem0.ai/blog/introducing-memory-decay-in-mem0)
 - [Graphiti：时间知识图谱](https://help.getzep.com/graphiti/getting-started/welcome)
