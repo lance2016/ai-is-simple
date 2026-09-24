@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""实战篇 06：给现有 Agent 接入 Phoenix 追踪。"""
+"""实战篇 06：给 Agent 加运行记录，方便排查问题"""
 
 from __future__ import annotations
 

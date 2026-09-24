@@ -129,14 +129,14 @@
 
 | 状态 | 实战 | 核心内容 | 对应理论篇 |
 | --- | --- | --- | --- |
-| ✅ | [01 · Mini Coding Agent](./labs/01-mini-coding-agent/) | 用 Python + DeepSeek 实现 `read / write / edit / bash` 四个工具，配一个网页界面：流式输出、逐步展示 tool call、改动前等你授权；留好三个扩展挂载点 | 01～04、15 |
-| ✅ | [02 · 记住项目](./labs/02-memory/) | `.agent/MEMORY.md` 每次带进 system prompt，技能只放目录、用到再读；不加新工具 | 07、09 |
-| ✅ | [03 · 交给子 Agent](./labs/03-subagent/) | `task` 工具背后是另一个只读的 `CodingAgent`，只交回总结 | 06 |
-| ✅ | [04 · 接真实 MCP](./labs/04-mcp/) | 手写 stdio MCP Server 和客户端，远程工具和本地工具走同一套授权 | 14、03 |
-| ✅ | [05 · 修到测试通过](./labs/05-verify/) | 模型想结束时由程序跑测试，没过就把失败输出送回循环 | 17、04 |
-| ✅ | [06 · 看见 Agent 的运行轨迹](./labs/06-observability/) | 用 Phoenix 和 OpenTelemetry 串起一次任务里的模型请求、工具调用、耗时与错误 | 01、02、15 |
-| ✅ | [07 · 给上下文腾出空间](./labs/07-context-management/) | 在任务结束后压缩旧对话，保留当前任务和关键信息 | 08、04 |
-| ✅ | [08 · 用案例衡量质量](./labs/08-evaluation/) | 用固定数据集和评分器比较 Agent 版本，并回到 Trace 定位失败 | 01、15 |
+| ✅ | [01 · 从零做一个能改代码的 Agent](./labs/01-mini-coding-agent/) | 用 Python + DeepSeek 实现 `read / write / edit / bash` 四个工具，配一个网页界面：流式输出、逐步展示 tool call、改动前等你授权；留好三个扩展挂载点 | 01～04、15 |
+| ✅ | [02 · 让 Agent 记住项目里的约定](./labs/02-memory/) | `.agent/MEMORY.md` 每次带进 system prompt，技能只放目录、用到再读；不加新工具 | 07、09 |
+| ✅ | [03 · 把项目调查交给子 Agent](./labs/03-subagent/) | `task` 工具背后是另一个只读的 `CodingAgent`，只交回总结 | 06 |
+| ✅ | [04 · 接入 MCP，让 Agent 读写笔记](./labs/04-mcp/) | 手写 stdio MCP Server 和客户端，远程工具和本地工具走同一套授权 | 14、03 |
+| ✅ | [05 · 让 Agent 按测试结果继续修代码](./labs/05-verify/) | 模型想结束时由程序跑测试，没过就把失败输出送回循环 | 17、04 |
+| ✅ | [06 · 给 Agent 加运行记录，方便排查问题](./labs/06-observability/) | 用 Phoenix 和 OpenTelemetry 串起一次任务里的模型请求、工具调用、耗时与错误 | 01、02、15 |
+| ✅ | [07 · 对话太长时，压缩旧内容并保留当前任务](./labs/07-context-management/) | 在任务结束后压缩旧对话，保留当前任务和关键信息 | 08、04 |
+| ✅ | [08 · 用固定任务比较 Agent 修改前后的表现](./labs/08-evaluation/) | 用固定数据集和评分器比较 Agent 版本，并回到 Trace 定位失败 | 01、15 |
 | 📖 | Pi 扩展阅读 | 理解 TypeScript/Node.js Harness 如何通过 Extension、Skill、Session 和 SDK 扩展 | — |
 
 想看哪个实战，一条命令启动，页面上会列出这个实战的示例任务，点一下就能用：

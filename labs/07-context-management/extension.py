@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""实战篇 07：在任务结束后压缩对话历史，给下一项任务腾出上下文。"""
+"""实战篇 07：对话太长时，压缩旧内容并保留当前任务"""
 
 from __future__ import annotations
 

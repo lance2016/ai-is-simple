@@ -1,4 +1,4 @@
-# 实战篇 06：看见 Agent 的运行轨迹
+# 实战篇 06：给 Agent 加运行记录，方便排查问题
 
 ![Agent 的一次运行如何形成 Trace](../../assets/lab-06-observability.png)
 

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""实战篇 08：用固定案例给 Agent 的回答和工具选择打分。"""
+"""实战篇 08：用固定任务比较 Agent 修改前后的表现"""
 
 from __future__ import annotations
 
