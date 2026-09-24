@@ -213,6 +213,7 @@ uv run python labs/01-mini-coding-agent/server.py --lab 05 --ext subagent
 | [06 · Agent 可观测性](../06-observability/) | `observability` | 复用现有事件流接入 Phoenix，不增加 Extension 挂载点 | 01 Agent Loop、02 Tool Use、15 Agent Harness |
 | [07 · 上下文管理](../07-context-management/) | `context` | 任务结束后压缩旧历史，保留当前任务 | 08 Context Compact、04 Hooks |
 | [08 · Agent 效果评估](../08-evaluation/) | `evaluation` | 用固定案例和 on_stop 评分器标注行为；离线实验比较版本 | 01 Agent Loop、15 Agent Harness |
+| [09 · Skill Loading：代码审查](../09-skill-loading/) | `skill-loading` | 按需读取 `SKILL.md`，由技能附带的脚本提供静态检查线索 | 07 Skill Loading |
 
 挂载点刻意只有三个。权限不单独做挂载点，仍然由每个工具自己的 `confirm_prompt` 决定。扩展加进来的工具，走的也是 `_execute()` 这个唯一入口和同一套授权。
 

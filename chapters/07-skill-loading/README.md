@@ -125,5 +125,6 @@ uv run python chapters/07-skill-loading/code.py
 
 ## 参考
 
+- [实战篇 09：Skill Loading 与代码审查脚本](../../labs/09-skill-loading/)
 - [learn-claude-code：s07 Skill Loading](https://github.com/shareAI-lab/learn-claude-code/tree/main/s07_skill_loading)
 - [DeepSeek Tool Calls 官方说明](https://api-docs.deepseek.com/guides/tool_calls/)

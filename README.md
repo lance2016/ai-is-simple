@@ -125,24 +125,25 @@
 
 实战篇和理论篇一样，也是 **主干 + 按需挂上的能力**：Lab 01 是主干；后面每个实战写一个扩展，挂到同一个 Agent 上，Agent Loop 一行不改。
 
-推荐路线按能力逐步展开到 Lab 08；这是一条学习路线，02～08 仍可按场景选择。
+推荐路线按能力逐步展开到 Lab 09；这是一条学习路线，02～09 仍可按场景选择。
 
 | 状态 | 实战 | 核心内容 | 对应理论篇 |
 | --- | --- | --- | --- |
 | ✅ | [01 · Coding Agent 搭建](./labs/01-mini-coding-agent/) | 用 Python + DeepSeek 实现 `read / write / edit / bash` 四个工具，配一个网页界面：流式输出、逐步展示 tool call、改动前等你授权；留好三个扩展挂载点 | 01～04、15 |
-| ✅ | [02 · 长期记忆](./labs/02-memory/) | 稳定项目规则常驻，过往经验按需读取；用一个 Skill 对照记忆与操作规范的区别 | 09（对照 07） |
+| ✅ | [02 · 长期记忆](./labs/02-memory/) | 当前对话保留任务状态；项目规则跨会话常驻，历史经验按需读取 | 09 |
 | ✅ | [03 · 子 Agent 任务委派](./labs/03-subagent/) | `task` 工具背后是另一个只读的 `CodingAgent`，只交回总结 | 06 |
 | ✅ | [04 · MCP 工具接入](./labs/04-mcp/) | 手写 stdio MCP Server 和客户端，远程工具和本地工具走同一套授权 | 14、03 |
 | ✅ | [05 · Hooks：代码验收](./labs/05-verify/) | 用第 04 章的 Stop Hook 在结束前运行测试；失败时把结果交回循环，和第 17 章的模型评审作对照 | 04（对照 17） |
 | ✅ | [06 · Agent 可观测性](./labs/06-observability/) | 用 Phoenix 和 OpenTelemetry 串起一次任务里的模型请求、工具调用、耗时与错误 | 01、02、15 |
 | ✅ | [07 · 上下文管理](./labs/07-context-management/) | 任务结束后压缩旧对话，保留当前任务和关键信息 | 08、04 |
 | ✅ | [08 · Agent 效果评估](./labs/08-evaluation/) | 用固定数据集和评分器比较 Agent 版本，并回到 Trace 定位失败 | 01、15 |
+| ✅ | [09 · Skill Loading：代码审查](./labs/09-skill-loading/) | 按需加载 `SKILL.md`，再用技能附带的脚本定位代码边界 | 07 |
 | 📖 | Pi 扩展阅读 | 理解 TypeScript/Node.js Harness 如何通过 Extension、Skill、Session 和 SDK 扩展 | — |
 
 想看哪个实战，一条命令启动，页面上会列出这个实战的示例任务，点一下就能用：
 
 ```bash
-uv run python labs/01-mini-coding-agent/server.py --lab 05   # 换成 02 / 03 / 04 / 05 / 06 / 07 / 08
+uv run python labs/01-mini-coding-agent/server.py --lab 05   # 换成 02～09
 ```
 
 想同时挂多个能力，再加 `--ext`，例如 `--lab 05 --ext subagent`。
@@ -361,7 +362,8 @@ ai-is-simple/
     ├── 05-verify/
     ├── 06-observability/ # Phoenix Compose 配置、演示工作区和实战截图
     ├── 07-context-management/ # 上下文预算与对话压缩
-    └── 08-evaluation/ # Phoenix 固定案例集与实验评分
+    ├── 08-evaluation/ # Phoenix 固定案例集与实验评分
+    └── 09-skill-loading/ # SKILL.md 与配套的代码审查脚本
 ```
 
 每个章节都是一个独立的小单元：

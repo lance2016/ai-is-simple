@@ -1,6 +1,8 @@
 ---
 name: stats-median
 type: episodic
+scope: project
+source: 对 stats.py 的一次代码审查
 description: 上次检查 stats.py 时发现，median() 对偶数个数字取错位置；还要检查空列表
 ---
 
