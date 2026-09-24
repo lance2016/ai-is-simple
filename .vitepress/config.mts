@@ -40,6 +40,7 @@ export default defineConfig({
     'README.md': 'index.md',
     'chapters/:dir/README.md': 'chapters/:dir/index.md',
     'labs/:dir/README.md': 'labs/:dir/index.md',
+    'references/README.md': 'references/index.md',
   },
   srcExclude: [
     ...NOT_PAGES,
@@ -102,6 +103,7 @@ export default defineConfig({
           { text: 'Lab 09 · Skill Loading：代码审查', link: '/labs/09-skill-loading/' },
         ],
       },
+      { text: '扩展阅读', link: '/references/' },
     ],
 
     outline: { level: [2, 3], label: '本页目录' },

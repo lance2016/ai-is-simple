@@ -23,7 +23,7 @@
 
 > **先理解最小原理，再逐个认识能力。**
 
-本项目分成两部分：第一部分用独立章节拆解 Agent 原理；第二部分把这些原理重新组合，做出一个可以运行的简易 Coding Agent，最后再把 Pi 作为工程化扩展阅读。
+本项目分成两部分：第一部分用独立章节拆解 Agent 原理；第二部分把这些原理重新组合，做出一个可以运行的简易 Coding Agent。完成主线后，可以到[扩展阅读页](./references/)继续看参考项目、记忆系统和相关标准。
 
 理论篇的每章 `code.py` 都是独立教学示例，方便单独运行和理解；它们不是一个逐章自动叠加的生产级 Agent。想学习时，建议沿着主线阅读；想实验时，可以直接进入任意一章或实战篇。
 
@@ -138,7 +138,7 @@
 | ✅ | [07 · 上下文管理](./labs/07-context-management/) | 任务结束后压缩旧对话，保留当前任务和关键信息 | 08、04 |
 | ✅ | [08 · Agent 效果评估](./labs/08-evaluation/) | 用固定数据集和评分器比较 Agent 版本，并回到 Trace 定位失败 | 01、15 |
 | ✅ | [09 · Skill Loading：代码审查](./labs/09-skill-loading/) | 按需加载 `SKILL.md`，再用技能附带的脚本定位代码边界 | 07 |
-| 📖 | Pi 扩展阅读 | 理解 TypeScript/Node.js Harness 如何通过 Extension、Skill、Session 和 SDK 扩展 | — |
+| 📖 | [扩展阅读](./references/) | 参考项目、记忆系统、Agent 框架、协议与评测资料；包含 Pi 和 learn-claude-code | — |
 
 想看哪个实战，一条命令启动，页面上会列出这个实战的示例任务，点一下就能用：
 
@@ -287,9 +287,11 @@ ai-is-simple/
 │   ├── chapter-16-workflow-runtime.png
 │   ├── chapter-17-goal-loop.png
 │   ├── lab-01-mini-coding-agent.png
+│   ├── lab-02-long-term-memory.png
 │   ├── lab-06-observability.png
 │   ├── lab-07-context-management.png
-│   └── lab-08-evaluation.png
+│   ├── lab-08-evaluation.png
+│   └── lab-09-skill-loading.png
 ├── pyproject.toml
 ├── uv.lock
 ├── .env.example
@@ -349,6 +351,8 @@ ai-is-simple/
 │   └── 17-goal-loop/
 │       ├── README.md
 │       └── code.py
+├── references/
+│   └── README.md         # Agent 项目、记忆系统、协议与评测资料
 └── labs/
     ├── 01-mini-coding-agent/
     │   ├── README.md
