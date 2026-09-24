@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""实战篇 06：记录 Agent 的模型和工具调用"""
+"""实战篇 06：Agent 可观测性"""
 
 from __future__ import annotations
 

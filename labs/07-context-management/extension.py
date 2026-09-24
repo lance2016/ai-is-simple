@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""实战篇 07：压缩旧对话，保留当前任务"""
+"""实战篇 07：上下文管理"""
 
 from __future__ import annotations
 

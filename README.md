@@ -129,14 +129,14 @@
 
 | 状态 | 实战 | 核心内容 | 对应理论篇 |
 | --- | --- | --- | --- |
-| ✅ | [01 · 做一个能改代码的 Agent](./labs/01-mini-coding-agent/) | 用 Python + DeepSeek 实现 `read / write / edit / bash` 四个工具，配一个网页界面：流式输出、逐步展示 tool call、改动前等你授权；留好三个扩展挂载点 | 01～04、15 |
-| ✅ | [02 · 给 Agent 加项目记忆](./labs/02-memory/) | `.agent/MEMORY.md` 每次带进 system prompt，技能只放目录、用到再读；不加新工具 | 07、09 |
-| ✅ | [03 · 让子 Agent 查代码并汇总](./labs/03-subagent/) | `task` 工具背后是另一个只读的 `CodingAgent`，只交回总结 | 06 |
-| ✅ | [04 · 用 MCP 让 Agent 读写笔记](./labs/04-mcp/) | 手写 stdio MCP Server 和客户端，远程工具和本地工具走同一套授权 | 14、03 |
-| ✅ | [05 · 测试失败后，Agent 接着修代码](./labs/05-verify/) | 模型想结束时由程序跑测试，没过就把失败输出送回循环 | 17、04 |
-| ✅ | [06 · 记录 Agent 的模型和工具调用](./labs/06-observability/) | 用 Phoenix 和 OpenTelemetry 串起一次任务里的模型请求、工具调用、耗时与错误 | 01、02、15 |
-| ✅ | [07 · 压缩旧对话，保留当前任务](./labs/07-context-management/) | 在任务结束后压缩旧对话，保留当前任务和关键信息 | 08、04 |
-| ✅ | [08 · 用同一组任务对比 Agent 版本](./labs/08-evaluation/) | 用固定数据集和评分器比较 Agent 版本，并回到 Trace 定位失败 | 01、15 |
+| ✅ | [01 · Coding Agent 搭建](./labs/01-mini-coding-agent/) | 用 Python + DeepSeek 实现 `read / write / edit / bash` 四个工具，配一个网页界面：流式输出、逐步展示 tool call、改动前等你授权；留好三个扩展挂载点 | 01～04、15 |
+| ✅ | [02 · 项目记忆](./labs/02-memory/) | `.agent/MEMORY.md` 每次带进 system prompt，技能只放目录、用到再读；不加新工具 | 07、09 |
+| ✅ | [03 · 子 Agent 任务委派](./labs/03-subagent/) | `task` 工具背后是另一个只读的 `CodingAgent`，只交回总结 | 06 |
+| ✅ | [04 · MCP 工具接入](./labs/04-mcp/) | 手写 stdio MCP Server 和客户端，远程工具和本地工具走同一套授权 | 14、03 |
+| ✅ | [05 · 代码自动验收](./labs/05-verify/) | 模型想结束时由程序跑测试，没过就把失败输出送回循环 | 17、04 |
+| ✅ | [06 · Agent 可观测性](./labs/06-observability/) | 用 Phoenix 和 OpenTelemetry 串起一次任务里的模型请求、工具调用、耗时与错误 | 01、02、15 |
+| ✅ | [07 · 上下文管理](./labs/07-context-management/) | 在任务结束后上下文管理和关键信息 | 08、04 |
+| ✅ | [08 · Agent 效果评估](./labs/08-evaluation/) | 用固定数据集和评分器比较 Agent 版本，并回到 Trace 定位失败 | 01、15 |
 | 📖 | Pi 扩展阅读 | 理解 TypeScript/Node.js Harness 如何通过 Extension、Skill、Session 和 SDK 扩展 | — |
 
 想看哪个实战，一条命令启动，页面上会列出这个实战的示例任务，点一下就能用：

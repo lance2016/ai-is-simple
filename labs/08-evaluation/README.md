@@ -1,4 +1,4 @@
-# 实战篇 08：用同一组任务对比 Agent 版本
+# 实战篇 08：Agent 效果评估
 
 ![固定输入经过 Agent 和评分规则，汇总成可比较的评估结果](../../assets/lab-08-evaluation.png)
 

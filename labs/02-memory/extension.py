@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""实战篇 02：给 Agent 加项目记忆
+"""实战篇 02：项目记忆
 
 不加任何新工具，只往系统提示里补一段话：
   .agent/MEMORY.md          全文放进系统提示（第 09 章 Memory）
