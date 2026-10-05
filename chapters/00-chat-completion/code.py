@@ -23,7 +23,7 @@ def main() -> None:
     messages = [
         {
             "role": "system",
-            "content": "你是一个简洁的中文助手。回答时请记住用户告诉你的信息。",
+            "content": "你是一个简洁的中文助手。",
         },
         {"role": "user", "content": "我叫小明。请简单介绍一下 Python。"},
     ]

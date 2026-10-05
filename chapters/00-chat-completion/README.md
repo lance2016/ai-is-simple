@@ -1,172 +1,73 @@
-# 第 00 章：Chat Completion —— 一次请求到底发生了什么？
+# 第 00 章：Chat Completion —— 一次请求发生了什么？
 
 ![Chat Completion：一次请求的输入与输出](../../assets/chapter-00-chat-completion.png)
 
-> **一句话总结：大模型不会自动知道你的应用发生了什么，它只会根据这一次请求提供给它的上下文生成下一条回复。**
+> **一句话总结：在本章使用的 DeepSeek Chat Completions 调用里，程序把 `messages` 发给模型，模型据此生成一条 `assistant message`。**
 
-Chat Completion（聊天补全）就是把一组消息发给模型，请它生成下一条回复。开始看 Agent 如何使用工具之前，先理解这次普通请求。
+面试里常见的追问是：“第二轮问模型我的名字，它为什么答得出来？”先看清一次请求里到底带了什么，后面的 Agent Loop 才好理解。
 
-很多复杂的 Agent，最后都建立在这个简单结构上：
+这里说的是项目当前使用的 DeepSeek Chat Completions 接口：它不会替应用保存上一轮对话，应用要把需要的历史放进本次 `messages`。其他 API 或产品可能提供服务端会话状态，不能把这条结论推广到所有模型接口。
 
-```text
-你的程序
-   ↓
-构造上下文
-   ↓
-调用模型
-   ↓
-得到 assistant message（模型回复）
-```
+## 先看图里的请求
 
-## 1. 先看最简单的一次请求
+- 程序准备 `system` 规则、对话历史和当前问题，再发起请求。
+- 模型根据这次收到的内容，返回一条 `assistant message`。
+- 如果请求提供了工具，返回也可能包含 `tool_calls`；本章先只认出这个名字，工具怎么执行留到后面讲。
 
-使用 OpenAI Python SDK 风格调用 DeepSeek：
+一次最小调用的关键部分是：
 
 ```python
-import os
-from dotenv import load_dotenv
-from openai import OpenAI
-
-load_dotenv()
-client = OpenAI(
-    api_key=os.environ["DEEPSEEK_API_KEY"],
-    base_url="https://api.deepseek.com",
-)
-
-messages = [
-    {"role": "system", "content": "你是一个简洁的 Python 助手。"},
-    {"role": "user", "content": "Python 的 list 和 tuple 有什么区别？"},
-]
-
 response = client.chat.completions.create(
-    model="deepseek-flash",
+    model=MODEL,
     messages=messages,
 )
-
-print(response.choices[0].message.content)
+assistant_message = response.choices[0].message
 ```
 
-这里先只看懂一条关系：
+`messages` 是按顺序排列的消息列表。先认识这几种角色就够了：
 
-```text
-messages
-   ↓
-模型
-   ↓
-assistant message
-```
-
-这还不是 Agent，只是一次普通的大模型请求。
-
-## 2. `messages` 到底是什么
-
-`messages` 可以简单理解成：
-
-> **这一次请求里，你希望模型看到的对话上下文。**
-
-最常见的角色可以先这样理解：
-
-| `role`（消息角色） | 可以先理解成 |
+| `role` | 这条消息是谁的 |
 | --- | --- |
-| `system` | 给模型的总体规则和身份 |
-| `user` | 用户说的话 |
-| `assistant` | 模型之前说过的话 |
-| `tool` | 工具执行后返回给模型的结果 |
+| `system` | 应用给模型的规则或背景 |
+| `user` | 用户输入 |
+| `assistant` | 模型之前的回复 |
+| `tool` | 工具执行后返回的结果，后续章节再展开 |
 
-## 3. 模型没有自动记住上一轮
+完整的客户端配置和可运行代码在 [`code.py`](./code.py)，上面只摘出一次请求的核心。
 
-假设第一轮对话是：
+## 第二轮为什么还认得“小明”
 
-```python
-messages = [
-    {"role": "user", "content": "我叫小明。"},
-]
-```
-
-模型回答：
-
-```text
-你好，小明。
-```
-
-接下来用户问：“我叫什么？”
-
-程序通常会把前面的内容再次放进上下文：
+第一次请求里，用户说了“我叫小明”。程序收到模型回复后，把这条回复和新问题接在历史后面，再发起第二次请求：
 
 ```python
-messages = [
-    {"role": "user", "content": "我叫小明。"},
-    {"role": "assistant", "content": "你好，小明。"},
-    {"role": "user", "content": "我叫什么？"},
-]
+messages.append(assistant_message.model_dump(exclude_none=True))
+messages.append({"role": "user", "content": "我叫什么名字？"})
 ```
 
-模型之所以看起来“记得”之前的聊天，通常是因为应用程序把历史消息再次发送给了它。
-
-> **每一次调用，都应该把它看成一次新的模型请求。**
-
-这里讨论的是普通 API 调用的心智模型，不展开 ChatGPT 产品里的 Memory。
-
-会话状态由应用管理：应用决定保存哪些消息、何时继续发送、何时压缩或清空。数据库里存着历史，并不表示模型自动看得到历史。
-
-## 4. 一次请求到底长什么样
-
-可以先把一次请求想成一个装上下文的盒子：
+此时发出的 `messages` 大致是：
 
 ```text
-┌─────────────────────────────┐
-│       一次模型请求           │
-│                             │
-│  model                      │
-│                             │
-│  messages                   │
-│   ├─ system                 │
-│   ├─ 对话历史               │
-│   ├─ 当前 user message      │
-│   └─ assistant 历史消息     │
-│                             │
-│  tools（可选）              │
-└──────────────┬──────────────┘
-               ↓
-              LLM
-               ↓
-┌─────────────────────────────┐
-│      assistant message       │
-│                             │
-│  content                    │
-│        或                   │
-│  tool_calls                 │
-└─────────────────────────────┘
+user: 我叫小明。请简单介绍一下 Python。
+assistant: 第一轮模型返回的内容
+user: 我叫什么名字？
 ```
 
-核心结论是：
+所以模型不是在两次请求之间自己保存了记忆；第二次请求里再次出现了相关历史。应用可以把历史存在数据库里，但仍要在请求时取出来并放进 `messages`，模型才看得到。
 
-> 大模型真正做的事情，可以先粗略理解成：根据当前上下文，生成下一条 `assistant message`。
+### 面试里再追问一步
 
-### 这条回复接下来有两条路
+**如果历史已经存进数据库，模型为什么还可能接不上话？**
 
-| 返回内容 | 程序下一步 | 适合的场景 |
-| --- | --- | --- |
-| `assistant.content` | 直接展示或继续处理文本 | 普通解释、改写、总结 |
-| `assistant.tool_calls`（工具调用请求） | 程序执行工具，把 `role="tool"` 结果追加后再次请求 | 需要读文件、查日期、写入外部系统 |
+<details>
+<summary>参考思路</summary>
 
-`tools` 只是“可选能力说明”，不是每次都必须调用。模型可以选择直接回答；即使模型提出了 `tool_call`，也只是提出请求，真正执行仍由程序决定。
+存储和模型可见是两件事。应用还要找到当前会话的历史并放进请求；历史过长时，也要决定保留、裁剪或总结哪些内容。上下文变长带来的问题会在第 08 章继续讲。
 
-## 下一章会发生什么
+</details>
 
-如果模型返回 `tool_calls`，程序可以执行对应工具，再把结果加入下一次请求。第 01 章会把这个过程放进循环里；本章先记住：程序准备每次请求的上下文，模型根据它返回一条消息。
+## 跑一下两轮对话
 
-## 用 DeepSeek 跑起来
-
-本章的完整代码在 [`code.py`](./code.py)。它只做五件事：
-
-1. 构造 `messages`；
-2. 调用一次 Chat Completion；
-3. 把 assistant 回复 append 回 `messages`；
-4. 再加入第二条 user message；
-5. 再调用一次。
-
-先配置 `.env`：
+完整示例先问 Python，再问“我叫什么名字？”。先在 `.env` 配置：
 
 ```env
 DEEPSEEK_API_KEY=你的_api_key
@@ -180,33 +81,24 @@ DEEPSEEK_MODEL=deepseek-flash
 uv run python chapters/00-chat-completion/code.py
 ```
 
-重点观察这两行：
+观察第二次 `create()` 收到的 `messages`：第一轮的 user 输入、assistant 回复和第二轮问题都在里面。这就是本章的关键，不需要给 system prompt 加一句“请记住用户”。
 
-```python
-messages.append(assistant_message.model_dump(exclude_none=True))
-messages.append({"role": "user", "content": "我叫什么名字？"})
-```
+## 今天只记住
 
-第一行保存模型之前的回复，第二行加入新的问题。多轮连续性来自这些消息被再次发送，而不是模型在请求之间自动记住了什么。
+多轮对话能接上，是因为应用把需要的消息带进了下一次请求。
 
-## 追问：下一轮为什么还看得到历史？
+## 想一想
 
-假设你和模型已经聊了 20 轮。现在用户发送第 21 条消息。
-
-模型为什么还能理解前面聊过的内容？
-
-是因为模型自己一直记着，还是因为程序做了什么？
-
-面试追问通常会落到两处：历史保存在哪里、以及如何避免把整段历史无限塞进下一次请求。本章只回答前一层原理；上下文预算见第 08 章。
+如果用户开了一个新会话，但程序误把上个会话的历史也放进 `messages`，模型会怎样回答？
 
 <details>
-<summary>参考思路（先自己想一想，再展开）</summary>
+<summary>参考思路</summary>
 
-是程序做的。每次请求时，程序把前 20 轮的 user / assistant 消息重新放进 `messages` 发出去，模型只是在这一次请求里读到了它们。聊得越久，这份历史越长，这也是第 08 章要处理上下文变长的原因。
+模型可能把旧会话的信息当成当前背景，给出不合适的回答。应用需要按会话区分历史，不能只把所有消息都追加到同一个列表里。
 
 </details>
 
 ## 参考
 
-- [DeepSeek OpenAI SDK 调用示例](https://api-docs.deepseek.com/api_samples/chat_python/)
-- [OpenAI Chat Completions API](https://platform.openai.com/docs/api-reference/chat)
+- [DeepSeek 多轮对话说明](https://api-docs.deepseek.com/guides/multi_round_chat/)
+- [DeepSeek Chat Completions API](https://api-docs.deepseek.com/api/create-chat-completion/)
