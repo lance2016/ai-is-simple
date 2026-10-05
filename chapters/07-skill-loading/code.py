@@ -32,8 +32,16 @@ class SkillLoader:
 
     def scan(self) -> None:
         self.skills.clear()
+        skills_root = self.skills_dir.resolve()
         for manifest in sorted(self.skills_dir.glob("*/SKILL.md")):
-            text = manifest.read_text(encoding="utf-8")
+            try:
+                # 登记时也检查真实路径，避免技能目录里的符号链接指向外部文件。
+                manifest_path = manifest.resolve()
+                if not manifest_path.is_relative_to(skills_root) or not manifest_path.is_file():
+                    continue
+                text = manifest_path.read_text(encoding="utf-8")
+            except (OSError, RuntimeError, UnicodeError):
+                continue
             name = self._field(text, "name") or manifest.parent.name
             description = self._field(text, "description")
             if not description:
@@ -44,12 +52,25 @@ class SkillLoader:
             self.skills[name] = {
                 "name": name,
                 "description": description,
-                "path": str(manifest),
+                "path": str(manifest_path),
             }
 
     @staticmethod
     def _field(text: str, field: str) -> str:
-        match = re.search(rf"^\s*{re.escape(field)}:\s*[\"']?(.+?)[\"']?\s*$", text, re.MULTILINE)
+        lines = text.splitlines()
+        if not lines or lines[0].strip() != "---":
+            return ""
+        try:
+            closing = lines.index("---", 1)
+        except ValueError:
+            return ""
+
+        frontmatter = "\n".join(lines[1:closing])
+        match = re.search(
+            rf"^\s*{re.escape(field)}:\s*[\"']?(.+?)[\"']?\s*$",
+            frontmatter,
+            re.MULTILINE,
+        )
         return match.group(1).strip() if match else ""
 
     def catalog(self) -> str:
@@ -65,14 +86,16 @@ class SkillLoader:
         if skill is None:
             available = ", ".join(self.skills) or "none"
             return f"Error: 未知技能 {name}。可用技能：{available}"
-        return Path(skill["path"]).read_text(encoding="utf-8")
+        try:
+            path = Path(skill["path"]).resolve()
+            if not path.is_relative_to(self.skills_dir.resolve()):
+                return "Error: 技能文件不在技能目录中"
+            return path.read_text(encoding="utf-8")
+        except (OSError, RuntimeError, UnicodeError):
+            return "Error: 技能文件无法读取"
 
 
 SKILL_LOADER = SkillLoader(SKILLS_DIR)
-
-
-def list_skills() -> str:
-    return SKILL_LOADER.catalog()
 
 
 def load_skill(name: str) -> str:
@@ -83,29 +106,42 @@ TOOLS = [
     {
         "type": "function",
         "function": {
-            "name": "list_skills",
-            "description": "列出当前可用技能的名称和简介。",
-            "parameters": {"type": "object", "properties": {}},
-        },
-    },
-    {
-        "type": "function",
-        "function": {
             "name": "load_skill",
             "description": "按技能名称加载完整 SKILL.md。",
             "parameters": {
                 "type": "object",
                 "properties": {"name": {"type": "string"}},
                 "required": ["name"],
+                "additionalProperties": False,
             },
         },
     },
 ]
 
-TOOL_HANDLERS = {
-    "list_skills": list_skills,
-    "load_skill": load_skill,
-}
+TOOL_HANDLERS = {"load_skill": load_skill}
+
+
+def run_tool_call(tool_call) -> str:
+    """检查模型生成的参数，再调用应用登记的工具。"""
+    name = tool_call.function.name
+    handler = TOOL_HANDLERS.get(name)
+    if handler is None:
+        return f"Error: 未知工具 {name}"
+
+    try:
+        arguments = json.loads(tool_call.function.arguments or "{}")
+    except (json.JSONDecodeError, TypeError):
+        return "Error: 工具参数不是合法 JSON"
+
+    # JSON Schema 会引导模型，但 Harness 仍要检查它实际发来的数据。
+    if (
+        not isinstance(arguments, dict)
+        or set(arguments) != {"name"}
+        or not isinstance(arguments["name"], str)
+    ):
+        return "Error: load_skill 需要且只接受一个字符串参数 name"
+
+    return handler(**arguments)
 
 
 def agent_loop(user_text: str) -> str:
@@ -136,15 +172,11 @@ def agent_loop(user_text: str) -> str:
             return message.content or ""
 
         for tool_call in message.tool_calls:
-            name = tool_call.function.name
-            arguments = json.loads(tool_call.function.arguments or "{}")
-            handler = TOOL_HANDLERS.get(name)
-            result = handler(**arguments) if handler else f"未知工具：{name}"
             messages.append(
                 {
                     "role": "tool",
                     "tool_call_id": tool_call.id,
-                    "content": str(result),
+                    "content": run_tool_call(tool_call),
                 }
             )
 

@@ -65,25 +65,55 @@ class TodoManager:
 TODO = TodoManager()
 
 
+def is_visible_project_path(path: Path) -> bool:
+    """隐藏文件可能包含密钥或本地状态，示例工具不读取它们。"""
+    try:
+        relative_path = path.resolve().relative_to(WORKDIR)
+    except (OSError, ValueError):
+        return False
+    return all(not part.startswith(".") for part in relative_path.parts)
+
+
 def safe_path(relative_path: str) -> Path:
-    path = (WORKDIR / relative_path).resolve()
-    if not path.is_relative_to(WORKDIR):
+    candidate = Path(relative_path)
+    if (
+        candidate.is_absolute()
+        or ".." in candidate.parts
+        or any(part.startswith(".") for part in candidate.parts)
+    ):
+        raise ValueError("只允许读取项目内的非隐藏路径")
+
+    path = (WORKDIR / candidate).resolve()
+    if not path.is_relative_to(WORKDIR) or not is_visible_project_path(path):
         raise ValueError("路径不能跳出项目目录")
     return path
 
 
 def list_files(pattern: str) -> str:
-    if Path(pattern).is_absolute() or ".." in Path(pattern).parts:
-        return "Error: pattern 只能在项目目录内使用"
+    candidate = Path(pattern)
+    if (
+        not pattern.strip()
+        or candidate.is_absolute()
+        or ".." in candidate.parts
+        or any(part.startswith(".") for part in candidate.parts)
+    ):
+        return "Error: pattern 只能匹配项目内的非隐藏路径"
     matches = sorted(
         str(path.relative_to(WORKDIR))
         for path in WORKDIR.glob(pattern)
         if path.is_file()
+        and is_visible_project_path(path)
     )
     return "\n".join(matches[:100]) or "(没有找到文件)"
 
 
 def read_file(path: str, limit: int = 60) -> str:
+    if (
+        isinstance(limit, bool)
+        or not isinstance(limit, int)
+        or not 1 <= limit <= 200
+    ):
+        raise ValueError("limit 必须是 1 到 200 之间的整数")
     lines = safe_path(path).read_text(encoding="utf-8").splitlines()
     if len(lines) > limit:
         lines = lines[:limit] + [f"...（还有 {len(lines) - limit} 行）"]
@@ -149,7 +179,7 @@ TOOLS = [
                 "type": "object",
                 "properties": {
                     "path": {"type": "string"},
-                    "limit": {"type": "integer"},
+                    "limit": {"type": "integer", "minimum": 1, "maximum": 200},
                 },
                 "required": ["path"],
             },
@@ -166,7 +196,13 @@ TOOL_HANDLERS = {
 
 def run_tool(tool_call) -> str:
     name = tool_call.function.name
-    arguments = json.loads(tool_call.function.arguments or "{}")
+    try:
+        arguments = json.loads(tool_call.function.arguments or "{}")
+    except (json.JSONDecodeError, TypeError) as exc:
+        return f"Error: 工具参数不是有效 JSON：{exc}"
+    if not isinstance(arguments, dict):
+        return "Error: 工具参数必须是 JSON 对象"
+
     handler = TOOL_HANDLERS.get(name)
     if handler is None:
         return f"Error: 未注册的工具 {name}"
@@ -204,9 +240,10 @@ def agent_loop(user_text: str) -> str:
 
         used_todo = False
         for tool_call in message.tool_calls:
-            if tool_call.function.name == "todo_write":
-                used_todo = True
             result = run_tool(tool_call)
+            # 只有清单确实更新成功，才算重置“长时间没更新”的计数。
+            if tool_call.function.name == "todo_write" and not result.startswith("Error:"):
+                used_todo = True
             messages.append(
                 {
                     "role": "tool",

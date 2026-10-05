@@ -23,28 +23,63 @@ OUTPUT_DIR = WORKDIR / ".task_outputs" / "tool-results"
 TRANSCRIPT_DIR = WORKDIR / ".transcripts"
 CONTEXT_CHAR_LIMIT = 12000
 LARGE_RESULT_CHAR_LIMIT = 1200
+SUMMARY_HISTORY_CHAR_LIMIT = 10000
 MAX_TURNS = 8
+INTERNAL_STORAGE_DIRS = {".task_outputs", ".transcripts"}
+
+
+def _has_only_allowed_hidden_parts(relative_path: Path) -> bool:
+    """只开放本示例自己写入的两个隐藏目录，拒绝秘密文件和目录。"""
+    return all(
+        not part.startswith(".") or (index == 0 and part in INTERNAL_STORAGE_DIRS)
+        for index, part in enumerate(relative_path.parts)
+    )
+
+
+def is_listable_path(path: Path) -> bool:
+    """搜索时跳过所有隐藏路径，包括内部 transcript 和结果文件。"""
+    try:
+        relative_path = path.resolve().relative_to(WORKDIR)
+    except (OSError, ValueError):
+        return False
+    return all(not part.startswith(".") for part in relative_path.parts)
 
 
 def safe_path(relative_path: str) -> Path:
-    path = (WORKDIR / relative_path).resolve()
+    requested_path = Path(relative_path)
+    if requested_path.is_absolute():
+        raise ValueError("只允许使用项目目录内的相对路径")
+
+    path = (WORKDIR / requested_path).resolve()
     if not path.is_relative_to(WORKDIR):
         raise ValueError("路径不能跳出项目目录")
+    if not _has_only_allowed_hidden_parts(path.relative_to(WORKDIR)):
+        raise ValueError("示例不开放隐藏路径，例如 .env 或 .git")
     return path
 
 
 def list_files(pattern: str) -> str:
-    if Path(pattern).is_absolute() or ".." in Path(pattern).parts:
+    pattern_path = Path(pattern)
+    if pattern_path.is_absolute() or ".." in pattern_path.parts:
         return "Error: pattern 只能在项目目录内使用"
+    if any(part.startswith(".") for part in pattern_path.parts):
+        return "Error: 示例不开放隐藏路径，例如 .env 或 .git"
     matches = sorted(
         str(path.relative_to(WORKDIR))
         for path in WORKDIR.glob(pattern)
         if path.is_file()
+        and is_listable_path(path)
     )
     return "\n".join(matches[:100]) or "(没有找到文件)"
 
 
 def read_file(path: str, limit: int = 180) -> str:
+    if (
+        not isinstance(limit, int)
+        or isinstance(limit, bool)
+        or not 1 <= limit <= 200
+    ):
+        raise ValueError("limit 必须是 1 到 200 之间的整数")
     lines = safe_path(path).read_text(encoding="utf-8").splitlines()
     if len(lines) > limit:
         lines = lines[:limit] + [f"...（还有 {len(lines) - limit} 行）"]
@@ -63,7 +98,8 @@ def persist_large_results(messages: list[dict]) -> list[dict]:
         content = str(item.get("content", ""))
         if item.get("role") == "tool" and len(content) > LARGE_RESULT_CHAR_LIMIT:
             OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
-            path = OUTPUT_DIR / f"{item.get('tool_call_id', uuid.uuid4().hex)}.txt"
+            # 路径名由程序生成，不依赖 API 返回的 ID 或其他外部文本。
+            path = OUTPUT_DIR / f"{uuid.uuid4().hex}.txt"
             path.write_text(content, encoding="utf-8")
             item["content"] = (
                 f"[完整工具结果已保存到 {path.relative_to(WORKDIR)}]\n"
@@ -76,7 +112,10 @@ def persist_large_results(messages: list[dict]) -> list[dict]:
 def write_transcript(messages: list[dict]) -> Path:
     TRANSCRIPT_DIR.mkdir(parents=True, exist_ok=True)
     path = TRANSCRIPT_DIR / f"transcript-{uuid.uuid4().hex[:8]}.json"
-    path.write_text(json.dumps(messages, ensure_ascii=False, indent=2, default=str), encoding="utf-8")
+    path.write_text(
+        json.dumps(messages, ensure_ascii=False, indent=2, default=str),
+        encoding="utf-8",
+    )
     return path
 
 
@@ -104,10 +143,45 @@ def snip_history(messages: list[dict], keep_recent: int = 8) -> list[dict]:
     return [*messages[:head_end], marker, *messages[tail_start:]]
 
 
+def summary_history_excerpt(messages: list[dict]) -> str:
+    """从最近消息往前取有限大小的完整 JSON 消息。"""
+    selected = []
+    remaining = SUMMARY_HISTORY_CHAR_LIMIT - 2  # 为 JSON 数组的方括号留出空间。
+    for message in reversed(messages):
+        encoded = json.dumps(message, ensure_ascii=False, default=str)
+        if len(encoded) + 2 <= remaining:
+            selected.append(message)
+            remaining -= len(encoded) + 2
+            continue
+
+        content = message.get("content")
+        if isinstance(content, str):
+            suffix = "\n[这条消息只保留末尾片段]"
+            empty_content = {**message, "content": ""}
+            content_budget = (
+                remaining
+                - len(json.dumps(empty_content, ensure_ascii=False, default=str))
+                - len(suffix)
+                - 2
+            )
+            if content_budget > 0:
+                clipped = {
+                    **message,
+                    "content": content[-content_budget:] + suffix,
+                }
+                if len(json.dumps(clipped, ensure_ascii=False, default=str)) + 2 <= remaining:
+                    selected.append(clipped)
+        break
+
+    selected.reverse()
+    return json.dumps(selected, ensure_ascii=False, default=str)
+
+
 def summarize_history(messages: list[dict], active_request: str) -> str:
-    transcript = json.dumps(messages, ensure_ascii=False, default=str)[-10000:]
+    history_excerpt = summary_history_excerpt(messages)
     response = client.chat.completions.create(
         model=MODEL,
+        max_tokens=1000,
         messages=[
             {
                 "role": "system",
@@ -118,7 +192,7 @@ def summarize_history(messages: list[dict], active_request: str) -> str:
                 "content": (
                     f"当前用户请求：{active_request}\n"
                     "请总结已经完成的工作、重要文件、决定和下一步。\n"
-                    f"历史片段：\n{transcript}"
+                    f"历史片段：\n{history_excerpt}"
                 ),
             },
         ],
@@ -178,7 +252,7 @@ TOOLS = [
                 "type": "object",
                 "properties": {
                     "path": {"type": "string"},
-                    "limit": {"type": "integer"},
+                    "limit": {"type": "integer", "minimum": 1, "maximum": 200},
                 },
                 "required": ["path"],
             },
@@ -191,12 +265,16 @@ TOOL_HANDLERS = {"list_files": list_files, "read_file": read_file}
 
 def run_tool(tool_call) -> str:
     name = tool_call.function.name
-    arguments = json.loads(tool_call.function.arguments or "{}")
     handler = TOOL_HANDLERS.get(name)
     if handler is None:
         return f"Error: 未注册的工具 {name}"
     try:
+        arguments = json.loads(tool_call.function.arguments or "{}")
+        if not isinstance(arguments, dict):
+            return "Error: 工具参数必须是 JSON 对象"
         return str(handler(**arguments))
+    except json.JSONDecodeError:
+        return f"Error: 工具 {name} 的参数不是合法 JSON"
     except Exception as exc:
         return f"Error: 工具 {name} 执行失败：{exc}"
 
