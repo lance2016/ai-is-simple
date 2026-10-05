@@ -48,9 +48,16 @@ class Journal:
         return STORE / f"{self.run_id}.json"
 
     @classmethod
-    def new(cls, name: str, args: dict) -> "Journal":
+    def new(cls, name: str, version: int, args: dict) -> "Journal":
         run_id = f"wf_{name}_{secrets.token_hex(4)}"
-        data = {"run_id": run_id, "name": name, "args": args, "status": "running", "steps": {}}
+        data = {
+            "run_id": run_id,
+            "name": name,
+            "version": version,
+            "args": args,
+            "status": "running",
+            "steps": {},
+        }
         journal = cls(run_id, data)
         journal.save()
         return journal
@@ -62,7 +69,33 @@ class Journal:
         path = STORE / f"{run_id}.json"
         if not path.is_file():
             raise WorkflowError(f"找不到工作流运行记录：{run_id}")
-        return cls(run_id, json.loads(path.read_text(encoding="utf-8")))
+        try:
+            data = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, UnicodeError, json.JSONDecodeError) as exc:
+            raise WorkflowError("工作流运行记录无法读取或不是有效 JSON。") from exc
+        if (
+            not isinstance(data, dict)
+            or data.get("run_id") != run_id
+            or not isinstance(data.get("name"), str)
+            or not isinstance(data.get("version"), int)
+            or isinstance(data.get("version"), bool)
+            or not isinstance(data.get("args"), dict)
+            or not isinstance(data.get("status"), str)
+            or data["status"] not in {"running", "completed"}
+            or not isinstance(data.get("steps"), dict)
+        ):
+            raise WorkflowError("工作流运行记录结构不完整或不受支持。")
+        for step, entry in data["steps"].items():
+            if (
+                not isinstance(step, str)
+                or not isinstance(entry, dict)
+                or entry.get("status") != "completed"
+                or not isinstance(entry.get("result"), str)
+            ):
+                raise WorkflowError("工作流运行记录中的步骤格式不正确。")
+        if data["status"] == "completed" and not isinstance(data.get("result"), dict):
+            raise WorkflowError("已完成的工作流缺少结果。")
+        return cls(run_id, data)
 
     def save(self) -> None:
         with self.lock:
@@ -96,7 +129,11 @@ def ask_agent(label: str, prompt: str) -> str:
             {"role": "user", "content": f"步骤：{label}\n\n{prompt}"},
         ],
     )
-    return response.choices[0].message.content or "(没有返回内容)"
+    choice = response.choices[0]
+    content = choice.message.content
+    if choice.finish_reason != "stop" or not isinstance(content, str) or not content.strip():
+        raise WorkflowError(f"步骤“{label}”没有正常完成，结果未写入运行记录。")
+    return content
 
 
 class WorkflowContext:
@@ -120,6 +157,11 @@ class WorkflowContext:
 
     def parallel(self, jobs: list[tuple[str, str]]) -> dict[str, str]:
         """并行屏障：所有独立步骤完成后，才把结果交给下一阶段。"""
+        if not jobs:
+            return {}
+        steps = [step for step, _ in jobs]
+        if len(set(steps)) != len(steps):
+            raise WorkflowError("并行步骤名称必须唯一，才能分别缓存和恢复。")
         with ThreadPoolExecutor(max_workers=min(4, len(jobs))) as pool:
             futures = {
                 pool.submit(self.agent, step, prompt): step
@@ -154,6 +196,7 @@ def review_project(ctx: WorkflowContext, args: dict) -> dict:
 
 WORKFLOWS = {
     "review_project": {
+        "version": 1,
         "description": "并行检查项目概念和结构，再汇总成学习笔记。",
         "phases": ["并行检查", "汇总结果"],
         "runner": review_project,
@@ -162,23 +205,56 @@ WORKFLOWS = {
 
 
 def validate_workflow(name: str, args: dict) -> None:
-    if not WORKFLOW_NAME_RE.fullmatch(name) or name not in WORKFLOWS:
+    if not isinstance(name, str) or not WORKFLOW_NAME_RE.fullmatch(name) or name not in WORKFLOWS:
         raise WorkflowError(f"未知或不安全的 Workflow：{name}")
     if not isinstance(args, dict):
         raise WorkflowError("args 必须是对象。")
+    unknown = set(args) - {"subject"}
+    if unknown:
+        raise WorkflowError(f"不支持的参数：{', '.join(sorted(map(str, unknown)))}")
+    subject = args.get("subject")
+    if subject is not None and (not isinstance(subject, str) or not subject.strip() or len(subject) > 500):
+        raise WorkflowError("subject 必须是 1～500 个字符的非空字符串。")
 
 
 def run_workflow(name: str, args: dict | None = None, resume_from_run_id: str | None = None) -> dict:
-    args = args or {}
+    args = {} if args is None else args
     validate_workflow(name, args)
-    journal = Journal.resume(resume_from_run_id) if resume_from_run_id else Journal.new(name, args)
+    if resume_from_run_id is not None and not isinstance(resume_from_run_id, str):
+        raise WorkflowError("resume_from_run_id 必须是字符串。")
+    workflow = WORKFLOWS[name]
+    journal = (
+        Journal.resume(resume_from_run_id)
+        if resume_from_run_id is not None
+        else Journal.new(name, workflow["version"], args)
+    )
     if journal.data.get("name") != name:
         raise WorkflowError("恢复记录的 Workflow 名称不匹配。")
+    if journal.data.get("version") != workflow["version"]:
+        raise WorkflowError("工作流版本已变化，不能安全复用旧步骤结果。")
+    if journal.data.get("args") != args and resume_from_run_id is not None:
+        # 恢复时以原始参数为准，避免调用者无意中改变缓存结果的上下文。
+        args = journal.data["args"]
     if journal.data.get("status") == "completed":
-        return {"run_id": journal.run_id, "status": "completed", "result": journal.data["result"], "resumed": True}
-    result = WORKFLOWS[name]["runner"](WorkflowContext(journal), journal.data.get("args", args))
+        return {
+            "run_id": journal.run_id,
+            "status": "completed",
+            "result": journal.data["result"],
+            "resumed": True,
+        }
+    print(f"[workflow] run_id={journal.run_id}", flush=True)
+    try:
+        result = workflow["runner"](WorkflowContext(journal), journal.data["args"])
+    except Exception as exc:
+        # 记录保持 running；调用者可用这个 ID 重跑未完成步骤。
+        raise WorkflowError(f"运行中断。可使用 run_id={journal.run_id} 恢复。") from exc
     journal.finish(result)
-    return {"run_id": journal.run_id, "status": "completed", "result": result, "resumed": bool(resume_from_run_id)}
+    return {
+        "run_id": journal.run_id,
+        "status": "completed",
+        "result": result,
+        "resumed": resume_from_run_id is not None,
+    }
 
 
 def list_workflows() -> str:
@@ -195,7 +271,7 @@ TOOLS = [
         "function": {
             "name": "list_workflows",
             "description": "列出已经注册的可信 Workflow。",
-            "parameters": {"type": "object", "properties": {}},
+            "parameters": {"type": "object", "properties": {}, "additionalProperties": False},
         },
     },
     {
@@ -207,7 +283,13 @@ TOOLS = [
                 "type": "object",
                 "properties": {
                     "name": {"type": "string"},
-                    "args": {"type": "object"},
+                    "args": {
+                        "type": "object",
+                        "properties": {
+                            "subject": {"type": "string", "minLength": 1, "maxLength": 500}
+                        },
+                        "additionalProperties": False,
+                    },
                     "resume_from_run_id": {"type": "string"},
                 },
                 "required": ["name"],
@@ -229,21 +311,34 @@ def agent_loop(user_text: str) -> str:
     ]
     for _ in range(MAX_TURNS):
         response = client.chat.completions.create(model=MODEL, messages=messages, tools=TOOLS, tool_choice="auto")
-        message = response.choices[0].message
+        choice = response.choices[0]
+        message = choice.message
         messages.append(message.model_dump(exclude_none=True))
         if not message.tool_calls:
+            if choice.finish_reason != "stop":
+                return f"模型未正常结束本轮（finish_reason={choice.finish_reason}）。"
             return message.content or ""
+        if choice.finish_reason != "tool_calls":
+            return f"模型未正常提出工具调用（finish_reason={choice.finish_reason}）。"
         for tool_call in message.tool_calls:
             try:
                 arguments = json.loads(tool_call.function.arguments or "{}")
+                if not isinstance(arguments, dict):
+                    raise WorkflowError("工具参数必须是 JSON 对象。")
                 if tool_call.function.name == "list_workflows":
+                    if arguments:
+                        raise WorkflowError("list_workflows 不接受参数。")
                     result = list_workflows()
                 elif tool_call.function.name == "run_workflow":
                     result = json.dumps(run_workflow(**arguments), ensure_ascii=False, indent=2)
                 else:
                     result = f"Error: 未知工具 {tool_call.function.name}"
+            except WorkflowError as exc:
+                result = f"Error: {exc}"
+            except (json.JSONDecodeError, TypeError) as exc:
+                result = f"Error: 工具参数无效（{type(exc).__name__}）"
             except Exception as exc:
-                result = f"Error: Workflow 执行失败：{exc}"
+                result = f"Error: Workflow 执行失败（{type(exc).__name__}）"
             messages.append({"role": "tool", "tool_call_id": tool_call.id, "content": result})
     return "达到最大轮数，主循环停止；如果需要继续，请使用上一次返回的 run_id。"
 

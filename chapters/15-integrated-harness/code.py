@@ -21,6 +21,7 @@ if not API_KEY:
 client = OpenAI(api_key=API_KEY, base_url=BASE_URL)
 WORKDIR = Path(__file__).resolve().parents[2]
 MAX_TURNS = 8
+RECENT_TOOL_TURNS = 3
 
 
 def function_tool(name: str, description: str, properties: dict, required=None) -> dict:
@@ -102,11 +103,10 @@ class Harness:
             )
         return tools
 
-    def before_tool(self, name: str, arguments: dict) -> str | None:
-        """PreToolUse：先拦截未知能力，再允许具体 handler 执行。"""
-        known = {tool["function"]["name"] for tool in self.tool_schemas()}
-        if name not in known:
-            return f"权限拒绝：工具 {name} 不在当前工具池中。"
+    def before_tool(self, name: str, offered_tool_names: set[str]) -> str | None:
+        """检查模型本轮实际拿到的能力清单和当前连接状态。"""
+        if name not in offered_tool_names:
+            return f"权限拒绝：工具 {name} 不在本轮工具清单中。"
         if name.startswith("mcp__") and "project_docs" not in self.mcp_servers:
             return "权限拒绝：MCP Server 尚未连接。"
         return None
@@ -160,36 +160,62 @@ class Harness:
                     results.append(f"{filename}:{number}: {line.strip()}")
         return "\n".join(results[:12]) or "(没有找到匹配内容)"
 
-    def dispatch(self, name: str, arguments: dict) -> str:
-        blocked = self.before_tool(name, arguments)
+    def dispatch(self, name: str, arguments: dict, offered_tool_names: set[str]) -> str:
+        """检查并执行单个调用；拒绝和执行结果都经过同一个记录点。"""
+        blocked = self.before_tool(name, offered_tool_names)
         if blocked:
-            return blocked
-        if name == "read_file":
-            result = self.read_file(**arguments)
-        elif name == "remember":
-            result = self.remember(**arguments)
-        elif name == "create_task":
-            result = self.create_task(**arguments)
-        elif name == "list_tasks":
-            result = self.list_tasks()
-        elif name == "connect_mcp":
-            result = self.connect_mcp(**arguments)
-        elif name == "mcp__project_docs__search":
-            result = self.mcp_search(**arguments)
+            result = blocked
+        elif not isinstance(arguments, dict):
+            result = "Error: 工具参数必须是 JSON 对象。"
         else:
-            result = f"Error: 未实现工具 {name}。"
-        self.after_tool(name, result)
+            try:
+                if name == "read_file":
+                    result = self.read_file(**arguments)
+                elif name == "remember":
+                    result = self.remember(**arguments)
+                elif name == "create_task":
+                    result = self.create_task(**arguments)
+                elif name == "list_tasks":
+                    result = self.list_tasks()
+                elif name == "connect_mcp":
+                    result = self.connect_mcp(**arguments)
+                elif name == "mcp__project_docs__search":
+                    result = self.mcp_search(**arguments)
+                else:
+                    result = f"Error: 未实现工具 {name}。"
+            except Exception as exc:
+                # 把失败作为工具结果交还模型，不让实现细节或本机路径泄露到对话。
+                result = f"Error: 工具执行失败（{type(exc).__name__}）。"
+        self.after_tool(name, str(result))
         return str(result)
 
     def compact(self, messages: list[dict]) -> list[dict]:
-        """只保留最近几轮，演示 Harness 可以在模型前整理上下文。"""
-        if len(messages) <= 14:
+        """保留初始请求和最近完整工具交互，不切断 tool_call 与结果的配对。"""
+        if len(messages) <= 2:
             return messages
-        return [
-            messages[0],
-            {"role": "system", "content": "较早的工具细节已压缩；保留其结论继续工作。"},
-            *messages[-10:],
-        ]
+
+        # 每个模型工具回合及其全部结果作为一组，避免留下没有对应结果的 tool_call。
+        groups: list[list[dict]] = []
+        index = 2  # 第 0 条是动态 system prompt，第 1 条是初始用户请求。
+        while index < len(messages):
+            item = messages[index]
+            group = [item]
+            index += 1
+            if item.get("role") == "assistant" and item.get("tool_calls"):
+                expected_ids = {call["id"] for call in item["tool_calls"]}
+                received_ids = set()
+                while index < len(messages) and messages[index].get("role") == "tool":
+                    tool_result = messages[index]
+                    group.append(tool_result)
+                    received_ids.add(tool_result.get("tool_call_id"))
+                    index += 1
+                # 不保留不完整的调用组；正常情况下每个调用都会有一个结果。
+                if not expected_ids.issubset(received_ids):
+                    continue
+            groups.append(group)
+
+        kept_groups = groups[-RECENT_TOOL_TURNS:]
+        return [messages[0], messages[1], *(item for group in kept_groups for item in group)]
 
 
 def agent_loop(user_text: str) -> str:
@@ -201,22 +227,37 @@ def agent_loop(user_text: str) -> str:
     for _ in range(MAX_TURNS):
         messages[0]["content"] = harness.system_prompt()
         messages = harness.compact(messages)
+        turn_tools = harness.tool_schemas()
         response = client.chat.completions.create(
             model=MODEL,
             messages=messages,
-            tools=harness.tool_schemas(),
+            tools=turn_tools,
             tool_choice="auto",
         )
-        message = response.choices[0].message
+        choice = response.choices[0]
+        message = choice.message
         messages.append(message.model_dump(exclude_none=True))
-        if not message.tool_calls:
+
+        if choice.finish_reason == "stop" and not message.tool_calls:
             return message.content or ""
+        if choice.finish_reason != "tool_calls" or not message.tool_calls:
+            return (
+                "模型本轮没有正常完成（"
+                f"finish_reason={choice.finish_reason}）；Harness 未把它当作任务完成。"
+            )
+
+        offered_tool_names = {
+            tool["function"]["name"] for tool in turn_tools
+        }
         for tool_call in message.tool_calls:
+            tool_name = tool_call.function.name
             try:
                 arguments = json.loads(tool_call.function.arguments or "{}")
-                result = harness.dispatch(tool_call.function.name, arguments)
-            except Exception as exc:
-                result = f"Error: 工具参数或执行失败：{exc}"
+            except (json.JSONDecodeError, TypeError):
+                result = "Error: 工具参数不是合法 JSON。"
+                harness.after_tool(tool_name, result)
+            else:
+                result = harness.dispatch(tool_name, arguments, offered_tool_names)
             messages.append(
                 {
                     "role": "tool",

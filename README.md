@@ -280,7 +280,7 @@ ai-is-simple/
 │   ├── chapter-08-context-compact.png
 │   ├── chapter-09-memory.png
 │   ├── chapter-10-tasks.png
-│   ├── chapter-11-background-tasks.png
+│   ├── chapter-11-background-tasks-v2.png
 │   ├── chapter-12-cron-scheduler.png
 │   ├── chapter-13-agent-teams.png
 │   ├── chapter-14-mcp-plugin.png

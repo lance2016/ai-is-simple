@@ -16,6 +16,7 @@ load_dotenv()
 
 MODEL = os.getenv("DEEPSEEK_MODEL", "deepseek-flash")
 BASE_URL = os.getenv("DEEPSEEK_BASE_URL", "https://api.deepseek.com")
+AGENT_ID = os.getenv("AGENT_ID", "agent")
 API_KEY = os.getenv("DEEPSEEK_API_KEY")
 if not API_KEY:
     raise SystemExit("请先在 .env 中填写 DEEPSEEK_API_KEY。")
@@ -36,6 +37,8 @@ class TaskStore:
         return TASKS_DIR / f"{task_id}.json"
 
     def create(self, subject: str, description: str = "") -> dict:
+        if not isinstance(subject, str) or not isinstance(description, str):
+            raise ValueError("任务标题和描述都必须是文本")
         subject = subject.strip()
         if not subject:
             raise ValueError("任务标题不能为空")
@@ -97,6 +100,10 @@ def update_task(task_id: str, add_blocked_by: list[str]) -> str:
     task = TASKS.load(task_id)
     if task["status"] != "pending" or task["owner"] is not None:
         return "只能给未领取的 pending 任务添加依赖"
+    if not isinstance(add_blocked_by, list) or any(
+        not isinstance(dependency, str) for dependency in add_blocked_by
+    ):
+        return "add_blocked_by 必须是任务 ID 列表"
 
     for dependency in add_blocked_by:
         if dependency == task_id:
@@ -127,24 +134,24 @@ def get_task(task_id: str) -> str:
     return json.dumps(TASKS.load(task_id), ensure_ascii=False, indent=2)
 
 
-def claim_task(task_id: str, owner: str = "agent") -> str:
+def claim_task(task_id: str) -> str:
     task = TASKS.load(task_id)
     if task["status"] != "pending":
         return f"任务当前状态是 {task['status']}，不能领取"
     if not TASKS.dependencies_ready(task):
         return f"任务仍被阻塞：{task['blockedBy']}"
     task["status"] = "in_progress"
-    task["owner"] = owner
+    task["owner"] = AGENT_ID
     TASKS.save(task)
     return f"已领取 {task_id}：{task['subject']}"
 
 
-def complete_task(task_id: str, owner: str = "agent") -> str:
+def complete_task(task_id: str) -> str:
     task = TASKS.load(task_id)
     if task["status"] != "in_progress":
         return f"任务当前状态是 {task['status']}，不能完成"
-    if task["owner"] != owner:
-        return f"任务负责人是 {task['owner']}，不是 {owner}"
+    if task["owner"] != AGENT_ID:
+        return f"任务负责人是 {task['owner']}，当前运行 Agent 是 {AGENT_ID}"
 
     # 先记录完成前的可领取状态，避免每次完成任务都重复报告旧的解锁项。
     ready_before = {
@@ -158,7 +165,7 @@ def complete_task(task_id: str, owner: str = "agent") -> str:
     TASKS.save(task)
 
     unblocked = [
-        candidate["subject"]
+        f"{candidate['id']} {candidate['subject']}"
         for candidate in TASKS.list()
         if candidate["status"] == "pending"
         and candidate["blockedBy"]
@@ -258,6 +265,34 @@ TOOL_HANDLERS = {
 }
 
 
+def execute_tool_call(tool_call) -> str:
+    """执行前验证模型给出的 JSON；工具描述不等于输入校验。"""
+    name = tool_call.function.name
+    try:
+        arguments = json.loads(tool_call.function.arguments or "{}")
+    except (json.JSONDecodeError, TypeError):
+        return "Error: 工具参数不是有效的 JSON。"
+    if not isinstance(arguments, dict):
+        return "Error: 工具参数必须是 JSON 对象。"
+
+    handler = TOOL_HANDLERS.get(name)
+    if handler is None:
+        return f"Error: 未知工具：{name}"
+    try:
+        return str(handler(**arguments))
+    except FileNotFoundError:
+        return "Error: 找不到任务记录或依赖任务。"
+    except json.JSONDecodeError:
+        return "Error: 任务记录不是有效的 JSON，请检查 .tasks/ 中的文件。"
+    except (TypeError, ValueError) as exc:
+        return f"Error: 参数或任务状态不合法：{exc}"
+    except OSError:
+        return "Error: 读取或保存任务文件失败。"
+    except Exception as exc:
+        # 不把本机完整路径等异常细节返回给模型。
+        return f"Error: 任务操作失败（{type(exc).__name__}）。"
+
+
 def agent_loop(user_text: str) -> str:
     messages = [
         {
@@ -277,20 +312,20 @@ def agent_loop(user_text: str) -> str:
             tools=TOOLS,
             tool_choice="auto",
         )
-        message = response.choices[0].message
+        choice = response.choices[0]
+        message = choice.message
         messages.append(message.model_dump(exclude_none=True))
 
         if not message.tool_calls:
+            if choice.finish_reason != "stop":
+                return f"模型未正常结束：{choice.finish_reason}；请检查任务状态和实际交付物。"
             return message.content or ""
 
+        if choice.finish_reason != "tool_calls":
+            return f"工具调用未正常结束：{choice.finish_reason}；没有执行这轮工具。"
+
         for tool_call in message.tool_calls:
-            name = tool_call.function.name
-            arguments = json.loads(tool_call.function.arguments or "{}")
-            handler = TOOL_HANDLERS.get(name)
-            try:
-                result = handler(**arguments) if handler else f"未知工具：{name}"
-            except Exception as exc:
-                result = f"Error: {exc}"
+            result = execute_tool_call(tool_call)
             messages.append(
                 {
                     "role": "tool",

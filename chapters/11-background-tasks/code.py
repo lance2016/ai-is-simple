@@ -27,7 +27,7 @@ MAX_TURNS = 8
 
 
 class BackgroundManager:
-    """用线程模拟慢任务，并把完成结果放进待收集队列。"""
+    """用线程模拟慢任务；状态和待收集通知都只保存在当前进程中。"""
 
     def __init__(self):
         self.jobs: dict[str, dict] = {}
@@ -35,9 +35,15 @@ class BackgroundManager:
         self.lock = threading.Lock()
 
     def start(self, label: str, seconds: int = 2) -> str:
-        if not label.strip():
+        if not isinstance(label, str) or not label.strip():
             raise ValueError("任务名称不能为空")
-        if not 1 <= seconds <= 10:
+        if len(label) > 120:
+            raise ValueError("任务名称不能超过 120 个字符")
+        if (
+            isinstance(seconds, bool)
+            or not isinstance(seconds, int)
+            or not 1 <= seconds <= 10
+        ):
             raise ValueError("示例只允许等待 1～10 秒")
 
         job_id = f"bg_{uuid.uuid4().hex[:8]}"
@@ -54,36 +60,65 @@ class BackgroundManager:
             args=(job_id, label, seconds),
             daemon=True,
         )
-        worker.start()
+        try:
+            worker.start()
+        except Exception as exc:
+            with self.lock:
+                job = self.jobs[job_id]
+                job["status"] = "failed"
+                job["error"] = type(exc).__name__
+                self.ready.append(job_id)
+            return f"后台任务启动失败：{job_id}（{type(exc).__name__}）"
         return f"后台任务已启动：{job_id}（{label}）"
 
     def _run(self, job_id: str, label: str, seconds: int) -> None:
-        time.sleep(seconds)
-        result = f"{label} 已完成，耗时约 {seconds} 秒。"
+        try:
+            time.sleep(seconds)
+            result = f"{label} 已完成，耗时约 {seconds} 秒。"
+            status = "completed"
+            error = ""
+        except Exception as exc:
+            result = ""
+            status = "failed"
+            # 示例只把错误类型交给模型，避免把线程内部细节原样暴露出去。
+            error = type(exc).__name__
+
         with self.lock:
             job = self.jobs.get(job_id)
             if job is None:
                 return
-            job["status"] = "completed"
+            job["status"] = status
             job["result"] = result
+            job["error"] = error
             self.ready.append(job_id)
 
     def collect(self) -> str:
         with self.lock:
             ready_ids = list(self.ready)
             self.ready.clear()
-            completed = [self.jobs[job_id] for job_id in ready_ids]
+            completed = [dict(self.jobs[job_id]) for job_id in ready_ids]
             running = [
-                job for job in self.jobs.values() if job["status"] == "running"
+                dict(job)
+                for job in self.jobs.values()
+                if job["status"] == "running"
             ]
 
-        lines = [
-            f"[task_notification] {job['id']}: {job['result']}"
-            for job in completed
-        ]
+        lines = []
+        for job in completed:
+            if job["status"] == "completed":
+                lines.append(
+                    f"[task_notification] {job['id']} status=completed: "
+                    f"{job['result']}"
+                )
+            else:
+                lines.append(
+                    f"[task_notification] {job['id']} status=failed "
+                    f"error={job['error']}"
+                )
         if running:
             lines.append(
-                "仍在运行：" + "、".join(job["id"] for job in running)
+                "仍在运行："
+                + "、".join(f"{job['id']}（{job['label']}）" for job in running)
             )
         return "\n".join(lines) or "(没有新的后台结果)"
 
@@ -96,28 +131,63 @@ def start_background_job(label: str, seconds: int = 2) -> str:
 
 
 def collect_background_jobs() -> str:
+    """取出新完成任务的一次性通知，并附上仍在运行的任务。"""
     return BACKGROUND.collect()
 
 
 def list_files(pattern: str = "chapters/**/*.md") -> str:
-    if Path(pattern).is_absolute() or ".." in Path(pattern).parts:
+    if not isinstance(pattern, str):
+        return "Error: pattern 必须是字符串"
+    pattern_path = Path(pattern)
+    if (
+        pattern_path.is_absolute()
+        or ".." in pattern_path.parts
+        or any(part.startswith(".") for part in pattern_path.parts)
+    ):
         return "Error: pattern 只能在项目目录内使用"
-    matches = sorted(
-        str(path.relative_to(WORKDIR))
-        for path in WORKDIR.glob(pattern)
-        if path.is_file()
-    )
+    matches = []
+    for path in WORKDIR.glob(pattern):
+        try:
+            resolved = path.resolve()
+            relative = resolved.relative_to(WORKDIR)
+        except (OSError, ValueError):
+            continue
+        if path.is_file() and not any(
+            part.startswith(".") for part in relative.parts
+        ):
+            matches.append(str(relative))
+    matches.sort()
     return "\n".join(matches[:100]) or "(没有找到文件)"
 
 
 def read_file(path: str, limit: int = 40) -> str:
-    file_path = (WORKDIR / path).resolve()
-    if not file_path.is_relative_to(WORKDIR):
+    if not isinstance(path, str):
+        return "Error: path 必须是字符串"
+    relative_path = Path(path)
+    if (
+        relative_path.is_absolute()
+        or ".." in relative_path.parts
+        or any(part.startswith(".") for part in relative_path.parts)
+    ):
+        return "Error: 只能读取项目内的非隐藏路径"
+    if (
+        isinstance(limit, bool)
+        or not isinstance(limit, int)
+        or not 1 <= limit <= 200
+    ):
+        return "Error: limit 必须是 1 到 200 之间的整数"
+
+    file_path = (WORKDIR / relative_path).resolve()
+    try:
+        file_path.relative_to(WORKDIR)
+    except ValueError:
         return "Error: 路径不能跳出项目目录"
+    if any(part.startswith(".") for part in file_path.relative_to(WORKDIR).parts):
+        return "Error: 只能读取项目内的非隐藏路径"
     try:
         lines = file_path.read_text(encoding="utf-8").splitlines()
     except Exception as exc:
-        return f"Error: {exc}"
+        return f"Error: 读取失败（{type(exc).__name__}）"
     if len(lines) > limit:
         lines = lines[:limit] + [f"...（还有 {len(lines) - limit} 行）"]
     return "\n".join(lines)
@@ -132,8 +202,17 @@ TOOLS = [
             "parameters": {
                 "type": "object",
                 "properties": {
-                    "label": {"type": "string", "description": "任务名称"},
-                    "seconds": {"type": "integer", "description": "模拟耗时，1 到 10 秒"},
+                    "label": {
+                        "type": "string",
+                        "description": "任务名称",
+                        "maxLength": 120,
+                    },
+                    "seconds": {
+                        "type": "integer",
+                        "description": "模拟耗时，1 到 10 秒",
+                        "minimum": 1,
+                        "maximum": 10,
+                    },
                 },
                 "required": ["label"],
             },
@@ -143,7 +222,7 @@ TOOLS = [
         "type": "function",
         "function": {
             "name": "collect_background_jobs",
-            "description": "收集已经完成的后台任务结果。",
+            "description": "收集新完成任务的一次性通知，并查看仍在运行的任务。",
             "parameters": {"type": "object", "properties": {}},
         },
     },
@@ -168,7 +247,7 @@ TOOLS = [
                 "type": "object",
                 "properties": {
                     "path": {"type": "string"},
-                    "limit": {"type": "integer"},
+                    "limit": {"type": "integer", "minimum": 1, "maximum": 200},
                 },
                 "required": ["path"],
             },
@@ -190,9 +269,10 @@ def agent_loop(user_text: str) -> str:
             "role": "system",
             "content": (
                 "你是一个简洁的中文助手。只有用户明确要求后台执行，"
-                "或任务确实是慢任务时，才使用 start_background_job。"
+                "或任务明显耗时且还有独立工作可做时，才使用 start_background_job。"
                 "后台启动后可以继续处理独立的读取任务，之后用 "
-                "collect_background_jobs 收集结果。"
+                "collect_background_jobs 查询结果。查询若返回 running，"
+                "不能说任务已完成；不要连续空转查询。"
             ),
         },
         {"role": "user", "content": user_text},
@@ -205,19 +285,19 @@ def agent_loop(user_text: str) -> str:
             tools=TOOLS,
             tool_choice="auto",
         )
-        message = response.choices[0].message
+        choice = response.choices[0]
+        message = choice.message
         messages.append(message.model_dump(exclude_none=True))
         if not message.tool_calls:
+            if choice.finish_reason != "stop":
+                return f"模型未正常结束：{choice.finish_reason}；后台任务可能仍在运行或待收集。"
             return message.content or ""
 
+        if choice.finish_reason != "tool_calls":
+            return f"工具调用未正常结束：{choice.finish_reason}；没有执行这轮工具。"
+
         for tool_call in message.tool_calls:
-            name = tool_call.function.name
-            arguments = json.loads(tool_call.function.arguments or "{}")
-            handler = TOOL_HANDLERS.get(name)
-            try:
-                result = handler(**arguments) if handler else f"未知工具：{name}"
-            except Exception as exc:
-                result = f"Error: {exc}"
+            result = run_tool_call(tool_call)
             messages.append(
                 {
                     "role": "tool",
@@ -227,6 +307,27 @@ def agent_loop(user_text: str) -> str:
             )
 
     return "达到最大轮数，循环停止；后台任务可能仍需下一轮收集。"
+
+
+def run_tool_call(tool_call) -> str:
+    """把模型返回的参数当作不可信输入，并让错误能回到模型上下文。"""
+    name = tool_call.function.name
+    try:
+        arguments = json.loads(tool_call.function.arguments or "{}")
+    except (json.JSONDecodeError, TypeError):
+        return "Error: 工具参数不是有效的 JSON 对象"
+    if not isinstance(arguments, dict):
+        return "Error: 工具参数必须是 JSON 对象"
+
+    handler = TOOL_HANDLERS.get(name)
+    if handler is None:
+        return f"Error: 未知工具 {name}"
+    try:
+        return str(handler(**arguments))
+    except (TypeError, ValueError) as exc:
+        return f"Error: {exc}"
+    except Exception as exc:
+        return f"Error: 工具执行失败（{type(exc).__name__}）"
 
 
 if __name__ == "__main__":
