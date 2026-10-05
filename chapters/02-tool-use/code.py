@@ -67,16 +67,33 @@ TOOLS = [
 ]
 
 
+def is_visible_path(path: Path) -> bool:
+    """拒绝隐藏文件、隐藏目录和指向它们的符号链接。"""
+    try:
+        relative_path = path.resolve().relative_to(WORKDIR)
+    except (OSError, ValueError):
+        return False
+    return not any(part.startswith(".") for part in relative_path.parts)
+
+
 def safe_path(relative_path: str) -> Path:
-    """只允许访问项目目录内的文件。"""
-    path = (WORKDIR / relative_path).resolve()
+    """只允许访问项目目录内的非隐藏路径。"""
+    requested_path = Path(relative_path)
+    if requested_path.is_absolute():
+        raise ValueError("只允许使用项目目录内的相对路径")
+    if any(part.startswith(".") and part not in {".", ".."} for part in requested_path.parts):
+        raise ValueError("示例不开放隐藏路径，例如 .env 或 .git")
+
+    path = (WORKDIR / requested_path).resolve()
     if not path.is_relative_to(WORKDIR):
         raise ValueError("路径不能跳出项目目录")
+    if not is_visible_path(path):
+        raise ValueError("示例不开放隐藏路径，例如 .env 或 .git")
     return path
 
 
 def list_files(pattern: str) -> str:
-    """列出项目内的文件，不接受绝对路径或 ..。"""
+    """列出项目内的非隐藏文件，不接受绝对路径或 ..。"""
     pattern_path = Path(pattern)
     if pattern_path.is_absolute() or ".." in pattern_path.parts:
         return "Error: pattern 只能在项目目录内使用"
@@ -85,19 +102,23 @@ def list_files(pattern: str) -> str:
         str(path.relative_to(WORKDIR))
         for path in WORKDIR.glob(pattern)
         if path.is_file()
+        and is_visible_path(path)
     )
     return "\n".join(matches[:100]) or "(没有找到文件)"
 
 
 def read_file(path: str, limit: int = 80) -> str:
     """读取项目内的文本文件，并限制返回行数。"""
+    if not isinstance(limit, int) or isinstance(limit, bool) or not 1 <= limit <= 200:
+        return "Error: limit 必须是 1 到 200 之间的整数"
+
     try:
         lines = safe_path(path).read_text(encoding="utf-8").splitlines()
         if len(lines) > limit:
             lines = lines[:limit] + [f"...（还有 {len(lines) - limit} 行）"]
         return "\n".join(lines)
-    except Exception as exc:
-        return f"Error: {exc}"
+    except (OSError, UnicodeError, ValueError) as exc:
+        return f"Error: 无法读取文件：{exc}"
 
 
 def get_today() -> str:
@@ -115,12 +136,17 @@ TOOL_HANDLERS = {
 def run_tool(tool_call) -> str:
     """解析参数，找到处理函数，执行后返回结果。"""
     name = tool_call.function.name
+    handler = TOOL_HANDLERS.get(name)
+    if handler is None:
+        return f"Error: 未注册的工具 {name}"
+
     try:
         arguments = json.loads(tool_call.function.arguments or "{}")
-        handler = TOOL_HANDLERS.get(name)
-        if handler is None:
-            return f"Error: 未注册的工具 {name}"
+        if not isinstance(arguments, dict):
+            return "Error: 工具参数必须是 JSON 对象"
         return str(handler(**arguments))
+    except json.JSONDecodeError:
+        return f"Error: 工具 {name} 的参数不是合法 JSON"
     except Exception as exc:
         return f"Error: 工具 {name} 执行失败：{exc}"
 

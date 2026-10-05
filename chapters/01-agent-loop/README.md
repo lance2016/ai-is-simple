@@ -2,87 +2,55 @@
 
 ![Agent Loop：模型决定、工具执行、工具结果、模型再次决定](../../assets/chapter-01-agent-loop.png)
 
-> **一句话总结：模型决定下一步，工具负责把这一步做出来。**
+> **Agent Loop 让应用根据模型每轮的返回，决定执行工具、继续请求，还是把回答交还给用户。**
 
-**本章新增：** 在一次模型请求外面套上循环：有 `tool_calls` 就执行工具、把结果送回模型，没有就结束。
+## 一次工具往返里发生什么
 
-## 先看图
+图里的循环由应用程序（Harness，负责提供工具并控制执行的代码）驱动：
 
-这张图只讲一个来回：
+1. 应用把用户任务和可用工具一起发给模型。
+2. 模型返回 `tool_calls` 时，它是在提出调用请求；工具还没有运行。
+3. 应用检查请求并执行工具，把结果作为 `role="tool"` 消息带上对应的 `tool_call_id`。
+4. 应用把更新后的消息再次发给模型。模型可以继续请求工具，也可以返回文字。
 
-- 用户输入一次任务；
-- 模型决定要不要用工具；
-- 工具执行并返回结果；
-- 模型根据结果继续决定；
-- 不需要工具时，输出答案并结束。
+没有工具调用时，这个示例把模型文字交给用户。DeepSeek 的工具调用文档也采用“模型提出调用—应用执行—结果交回模型”的往返方式；模型本身不会执行你的 Python 函数。
 
-注意：工具结果回到的是“模型决定”，不是重新回到“用户任务”。用户不会每一轮都重新输入。
+## 看代码里的循环
 
-还要区分三个“结束”：
-
-- **模型结束**：这次回复没有 `tool_calls`，模型选择直接说话；
-- **循环结束**：程序遇到上面的条件，或达到最大轮数；
-- **任务完成**：用户真正想要的结果已经被验证。
-
-前两个是程序状态，最后一个才是用户目标。模型说“完成了”，不等于文件真的写对了或测试真的通过了。
-
-## 用生活例子理解
-
-你对一个助理说：
-
-> “帮我整理一下上周的产品反馈，并生成一份报告。”
-
-助理会这样工作：
-
-1. 理解任务；
-2. 找到合适的工具；
-3. 读取工具返回的内容；
-4. 决定要不要继续查找；
-5. 信息足够后，输出报告。
-
-第 4 步是 Agent 和普通问答最不一样的地方：它会根据刚刚拿到的结果自己继续判断。
-
-## 用 DeepSeek 跑起来
-
-先安装依赖：
+本章的完整示例在 [`code.py`](./code.py)，只注册了一个无副作用的日期查询工具。先准备密钥并运行：
 
 ```bash
 uv sync
 cp .env.example .env
 ```
 
-然后在 `.env` 中填写：
+在 `.env` 中填写 `DEEPSEEK_API_KEY`，然后执行：
 
 ```bash
-DEEPSEEK_API_KEY=你的_api_key
+uv run python chapters/01-agent-loop/code.py
 ```
 
-本章的完整代码在 [`code.py`](./code.py)。它只提供一个安全的小工具：获取今天的日期。
-
-```python
-from openai import OpenAI
-
-client = OpenAI(
-    api_key=os.environ["DEEPSEEK_API_KEY"],
-    base_url="https://api.deepseek.com",
-)
-```
-
-真正的循环只有这几步（完整代码还加了 `MAX_TURNS`，给循环设上限）：
+控制流的关键部分是：
 
 ```python
 for _ in range(MAX_TURNS):
     response = client.chat.completions.create(
-        model="deepseek-flash",
+        model=MODEL,
         messages=messages,
-        tools=tools,
+        tools=TOOLS,
+        tool_choice="auto",
     )
-
-    message = response.choices[0].message
+    choice = response.choices[0]
+    message = choice.message
     messages.append(message.model_dump(exclude_none=True))
 
     if not message.tool_calls:
+        if choice.finish_reason != "stop":
+            return f"模型未正常结束：{choice.finish_reason}"
         return message.content or ""
+
+    if choice.finish_reason != "tool_calls":
+        return f"工具调用未正常结束：{choice.finish_reason}"
 
     for call in message.tool_calls:
         result = run_tool(call)
@@ -93,59 +61,35 @@ for _ in range(MAX_TURNS):
         })
 ```
 
-代码里的角色很清楚：
+`messages` 保留了用户输入、模型的工具请求和工具结果，所以模型下一轮能依据执行结果继续判断。示例按返回顺序逐个执行调用；如果改成并行，先确认这些工具互不依赖，并且并发执行不会带来副作用问题。
 
-- `message.tool_calls` 有内容：模型想做事，循环继续；
-- `message.tool_calls` 为空：模型不需要工具，循环结束；
-- `role="tool"`：把工具结果送回模型。
+## 停止不代表任务已完成
 
-### 停止条件不等于完成条件
+这里有两种不同的停止信号：
 
-如果用户问“今天是几号”，模型通常会调用 `get_today`，拿到结果后再回答；如果用户问“Python 是什么”，模型可以直接回答，不需要工具。两种情况都可能触发循环结束，但只有带外部验证的任务，才适合进一步判断“目标是否完成”。
+- 没有 `tool_calls` 且 `finish_reason` 为 `stop`：这轮模型回复正常结束，程序把文字交给调用方。
+- 到达 `MAX_TURNS`：程序停止继续请求，避免循环无限延长。
 
-`MAX_TURNS` 是安全护栏，不是成功判断。真实应用还应根据任务类型增加测试、文件检查或人工确认。
+两者都不能单独证明用户目标已经达成。比如工具返回了错误，模型仍可能生成“已完成”。面试时可以继续追问：应用如何验证结果？应根据任务查看可信证据，例如文件差异、测试退出码或数据库状态，而不是只信模型的自我报告。
 
-面试时可用这句话区分：**循环回答“还要不要继续请求模型”，验收回答“用户要的结果是否成立”。** 对客观条件优先读工具产生的证据，例如退出码、数据库状态或文件差异；不能只把模型的自我报告当作成功。
+`finish_reason` 也值得检查：DeepSeek 文档列出的结束原因包括 `length`、`content_filter`、`insufficient_system_resource` 和 `aborted`。本例只有在没有工具调用且原因为 `stop` 时才返回模型文字；有工具调用时也只有原因为 `tool_calls` 才执行。其他状态都交给调用方，避免执行可能被截断的参数。生产应用还需对 API 超时、无效工具参数和工具执行失败分别定义恢复策略。
 
-## 最小的 Agent 是什么
+每次继续循环都会再请求一次模型并带上消息历史，会增加延迟和 token 成本。直接回答就足够的任务不必调用工具；工具调用只是模型可选的下一步。
 
-项目的第一个课程把复杂的 Agent 简化成三个部分：
+## 面试练习
 
-- **模型**：理解任务，决定下一步做什么；
-- **工具**：执行模型要求的动作；
-- **循环**：把工具结果送回模型。
-
-## 模型和 Harness 的分工
-
-可以把模型理解成驾驶者，把 Harness 理解成车辆：
-
-- 模型负责理解、判断和选择动作；
-- Harness 提供工具、上下文、权限和执行环境；
-- 工具真的去读文件、运行命令或访问外部系统；
-- 循环负责把结果带回来。
-
-模型本身不会凭空获得“手脚”。没有工具，它只能告诉你“应该做什么”；有了 Harness，动作才会真的发生。
-
-一个工具加一个循环，就构成了一个最小的 Agent。后面的权限、计划、记忆、团队协作，都是围绕这个基础循环增加的能力；它们不是每个任务都必须启用。
-
-## 设计题：怎样避免循环停得太早或太晚？
-
-如果模型只有一把 `bash` 工具，会遇到什么问题？
-
-提示：它可以做很多事，但每件事都要自己拼命令，容易出错。下一章会把更多清晰、专用的工具接进来。
+假设 Agent 已经调用工具，但第 8 轮仍未给出最终答案。你会向调用方返回什么状态？如何区分“循环被上限截停”和“任务成功完成”？
 
 <details>
-<summary>参考思路（先自己想一想，再展开）</summary>
+<summary>参考思路</summary>
 
-`bash` 什么都能做，但每个动作都要模型自己拼命令：参数容易写错，输出格式也不稳定。更麻烦的是，程序很难从一串命令里分清“只是读文件”还是“删除文件”，权限没法按动作细分。专用工具把参数结构和边界提前定好。
-
-实战篇仍然保留了 `bash`，是因为它配合了 Harness 里的命令检查和确认，不是裸用。
+应明确报告循环触及上限，不能伪装成成功答案；如果有部分结果，也要标出尚未验证的部分。要判断任务成功，需要按任务类型检查外部证据。若经常触顶，再检查工具是否返回过多内容、任务是否需要拆分，或循环是否缺少清晰的停止条件。
 
 </details>
 
 ## 参考
 
-- [learn-claude-code](https://github.com/shareAI-lab/learn-claude-code)
-- [s01 Agent Loop](https://github.com/shareAI-lab/learn-claude-code/tree/main/s01_agent_loop)
-- [DeepSeek OpenAI SDK 调用示例](https://api-docs.deepseek.com/api_samples/chat_python/)
+- [learn-claude-code：s01 Agent Loop](https://github.com/shareAI-lab/learn-claude-code/tree/main/s01_agent_loop)
 - [DeepSeek Tool Calls](https://api-docs.deepseek.com/guides/tool_calls/)
+- [DeepSeek Chat Completions API](https://api-docs.deepseek.com/api/create-chat-completion/)
+- [OpenAI Function Calling](https://developers.openai.com/api/docs/guides/function-calling)

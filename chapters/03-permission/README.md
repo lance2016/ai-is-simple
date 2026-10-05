@@ -1,113 +1,72 @@
-# 第 03 章：Permission —— 执行前先过一道门
+# 第 03 章：Permission——工具执行前的权限判断
 
 ![Permission：工具执行前的权限检查](../../assets/chapter-03-permission.png)
 
-> **一句话总结：模型可以提出工具请求，但程序必须在真正执行前检查权限。**
+> **一句话总结：模型提出工具调用，应用程序决定它能不能执行。**
 
-**本章新增：** 在“找到工具”和“执行工具”之间，新增一道 `check_permission()`。
+模型返回 `write_note(path, content)`，不代表文件已经写入。Harness（连接模型、工具和运行规则的应用代码）应在调用工具函数前检查这次操作；需要确认时，先展示具体内容，得到同意后再执行。
 
-第 02 章解决了“模型选中工具后，程序怎么找到它”。
+## 沿着图看执行顺序
 
-这一章继续问一个更重要的问题：
+本章的边界在“模型提议”与“工具执行”之间：
 
-> **找到工具之后，是不是任何请求都应该直接执行？**
+1. 模型提出工具和参数；
+2. 程序检查工具、参数和资源范围；
+3. 策略决定直接允许、要求确认，或拒绝；
+4. 只有通过检查的调用才进入工具函数。
 
-答案是：不应该。模型会犯错，用户也可能提出危险操作。权限检查应该放在工具函数真正运行之前。
+这三种结果在代码里分别是 `ALLOW`、`ASK` 和 `DENY`。它们是应用自己的策略决定，不由提示词或模型回答决定。DeepSeek 的工具调用文档也把模型返回的 function call 和应用实际执行函数分成两步：函数需要由应用提供并调用。
 
-## 先看图
+## 权限判断和用户确认不是一回事
 
-图里只有一条新规则：
+一个常见面试追问是：“用户点了允许，操作就一定合法的吗？”不一定。确认只表示用户同意眼前这个动作；服务端仍要检查当前用户能不能改这个资源、目标和参数是否在允许范围内。
 
-- 模型只是提出操作；
-- 程序先把请求送进“权限检查”；
-- 普通读取可以直接允许；
-- 写入等有影响的操作需要用户确认；
-- 明确危险的操作直接拒绝；
-- 最后才有机会进入工具执行。
-
-权限检查不是对模型“更有礼貌地提醒一下”，而是程序自己的控制点。
-
-## 用门卫理解 Permission
-
-把工具想成办公室里的房间：
-
-- `read_file` 像查看公开资料，可以直接进入；
-- `write_note` 像修改文件，需要问一下负责人；
-- `delete_file` 像拆除房间，示例程序直接禁止。
-
-模型可以走到门口提出请求，但不能自己决定门是否打开。
-
-## 三种结果
-
-一个简单的权限管道，可以先分成三种结果：
-
-| 结果 | 什么时候发生 | 程序怎么做 |
+| 机制 | 它回答的问题 | 示例中的做法 |
 | --- | --- | --- |
-| 直接允许 | 只读、范围明确 | 调用工具函数 |
-| 需要确认 | 会改变文件或状态 | 暂停并询问用户 |
-| 立即拒绝 | 明确禁止或越界 | 不调用工具，返回拒绝结果 |
+| 参数校验 | 请求格式和路径是否符合预期？ | 路径不能跳出项目，读取范围有限 |
+| 授权策略 | 当前调用者能否执行此操作？ | 示例只允许写入 `notes/` |
+| 用户确认 | 用户是否同意这一次具体写入？ | 展示路径和完整内容后再询问 |
+| 执行隔离 | 即使应用判断出错，影响范围能否被限制？ | 生产环境还应使用文件、进程或网络隔离 |
 
-代码里的顺序很重要：先检查，再执行。
+本例是单人命令行程序，所以 `input()` 只是演示“先问、后执行”。多人服务要从已认证的服务端会话取得用户身份和资源归属，不能把模型参数里的 `user_id` 当成身份凭证。确认也应绑定到当前用户和这次具体操作；参数变化后，需要重新确认。未知工具、格式错误的参数和越界路径都应失败关闭，也就是拒绝执行。
 
-## 权限检查应该放在哪里
+提示词可以引导模型，但不能当权限边界。仓库文件、网页和工具返回内容都可能包含恶意指令；读取到内容不代表应照做。权限校验要放在所有工具调用必经的执行入口，工具注解或模型自述也不能代替程序检查。
 
-第 02 章的工具执行大致是：
+## 代码里新增了哪一步
+
+第 02 章的最小执行方式是：
 
 ```python
 handler = TOOL_HANDLERS[name]
 result = handler(**arguments)
 ```
 
-第 03 章只增加一个关卡：
+本章先得到明确的策略结果，再处理确认，最后才调用处理函数：
 
 ```python
-allowed, reason = check_permission(name, arguments)
+decision, reason = check_permission(name, arguments)
 
-if not allowed:
-    result = f"Permission denied: {reason}"
-else:
-    handler = TOOL_HANDLERS[name]
-    result = handler(**arguments)
+if decision is PermissionDecision.DENY:
+    return f"Permission denied: {reason}"
+if decision is PermissionDecision.ASK and not confirm_write(arguments):
+    return "Permission denied: 用户没有确认写入"
+
+return TOOL_HANDLERS[name](**arguments)
 ```
 
-注意：权限检查必须发生在 `handler(...)` 之前。否则工具已经执行完了，再说“要不要允许”就没有意义了。
+把策略判断与询问用户分开，方便面试时解释各自职责：策略决定“这类动作是否可做”，确认流程决定“当前这次动作是否获准继续”。真实服务还要在执行前再次核对用户、目标和参数，避免把一份旧确认复用到不同动作上。
 
-## 不要只相信模型
+示例只开放了很小的范围：
 
-可以让模型尽量选对工具，但不能把安全责任交给模型：
+- `read_file` 只读取根目录指定的教学文档和 `chapters/` 下的文件，并拒绝 `.env`、`.git` 等路径；
+- `write_note` 只写入 `notes/`，确认提示会展示写入路径和完整内容；
+- `delete_file` 永远拒绝，模型即使提出调用也不会进入工具函数。
 
-```text
-模型说：请删除这个文件
-程序问：这个工具允许删除吗？
-程序答：不允许，所以根本不执行
-```
+每次写入都弹确认比较容易造成“确认疲劳”，让人习惯性点击同意。真实产品通常会结合风险、操作范围和执行隔离来控制提示频率；确认框不能单独承担全部安全责任。[Anthropic 对权限提示与沙箱的说明](https://www.anthropic.com/engineering/claude-code-sandboxing)给出了这类取舍的实际案例。
 
-权限是程序代码，模型输出只是待检查的输入。
+## 运行示例
 
-### 面试里把“确认”与“授权”分开
-
-本例是单人本地程序，写入时弹窗确认足以演示控制点。多人服务不能只问“用户点了允许吗”，还要确认调用者身份、资源归属和操作范围；`user_id`、项目路径等身份信息应由服务端会话提供，不能相信模型自己填的参数。
-
-可以把防线按层讲清楚：工具参数和业务规则校验、基于身份与资源的授权、执行环境的文件和网络隔离。提示词能引导模型，确认框能让人审阅一次动作；两者都不能替代不可绕过的服务端检查。来自网页、仓库文件或 MCP Server 的内容也可能带有恶意指令，读到内容不代表信任内容。
-
-### 这个示例到底允许什么？
-
-- `read_file` 只读根目录的教学文档和 `chapters/` 下的文件；`.env`、`.git` 等敏感路径会被拒绝；
-- `write_note` 只能写入 `notes/`，不会因为模型传入一个路径就覆盖项目任意文件；
-- `delete_file` 永久拒绝。参数“看起来合法”，不等于动作“已经获授权”。
-
-这是一条很重要的边界：模型负责提出意图，程序负责把意图限制在安全范围内。
-
-## 用 DeepSeek 跑起来
-
-本章的完整代码在 [`code.py`](./code.py)。它沿用前一章的 Tool Use，但增加了 `check_permission()`：
-
-- `read_file`：读取允许范围内的文件，`.env` 等敏感文件会拒绝；
-- `write_note`：只能写入 `notes/`，并在确认时展示目标路径和完整内容；
-- `delete_file`：列在拒绝列表里，永远不会执行；
-- 路径跳出项目目录：直接拒绝。
-
-先配置 `.env`：
+完整代码在 [`code.py`](./code.py)，它沿用第 02 章的 Tool Use，只展开权限边界。先在 `.env` 中配置：
 
 ```env
 DEEPSEEK_API_KEY=你的_api_key
@@ -121,24 +80,16 @@ DEEPSEEK_MODEL=deepseek-flash
 uv run python chapters/03-permission/code.py
 ```
 
-可以试试：
+可以依次试试读取 `README.md`、写入 `notes/today.txt`，再请求删除 `README.md`。观察删除请求：即使模型发出了工具调用，程序也会在执行前拒绝它。
 
-```text
-请读取 README.md
-请写一条笔记到 notes/today.txt
-请删除 README.md
-```
+### 面试追问
 
-观察第三个请求：模型可以提出 `delete_file`，但程序不会执行对应动作。
-
-## 场景题：删除操作要经过哪些检查？
-
-如果下一步还要增加日志、统计和结果检查，哪些逻辑可以作为 Hook 扩展，哪些授权规则必须保证每次执行工具时都经过？
+如果用户确认写入 `notes/today.txt`，但执行前目标路径或文件内容变了，还能沿用这次确认吗？
 
 <details>
-<summary>参考思路（先自己想一想，再展开）</summary>
+<summary>参考思路</summary>
 
-日志和统计适合挂在固定节点上；关键授权则必须留在所有工具调用都会经过的执行边界。下一章用 Hook 演示一种扩展方式，也会讨论它的边界。
+不能。确认应对应到具体用户和具体参数；操作内容变化，就重新校验并再次确认。执行入口还要确认授权，不能只凭一个 `confirmed=True` 就放行。
 
 </details>
 
@@ -146,5 +97,5 @@ uv run python chapters/03-permission/code.py
 
 - [learn-claude-code：s03 Permission](https://github.com/shareAI-lab/learn-claude-code/tree/main/s03_permission)
 - [DeepSeek Tool Calls 官方说明](https://api-docs.deepseek.com/guides/tool_calls/)
-- [Anthropic：How we contain Claude](https://www.anthropic.com/engineering/how-we-contain-claude)
-- [MCP：Tool Annotations as Risk Vocabulary](https://blog.modelcontextprotocol.io/posts/2026-03-16-tool-annotations/)
+- [Anthropic：Beyond permission prompts—sandboxing Claude Code](https://www.anthropic.com/engineering/claude-code-sandboxing)
+- [OWASP：AI Agent Security Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/AI_Agent_Security_Cheat_Sheet.html)

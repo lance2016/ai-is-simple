@@ -3,6 +3,7 @@
 
 import json
 import os
+from enum import Enum
 from pathlib import Path
 
 from dotenv import load_dotenv
@@ -65,7 +66,10 @@ TOOLS = [
 
 def safe_path(relative_path: str) -> Path:
     """只允许访问项目目录内的路径。"""
-    path = (WORKDIR / relative_path).resolve()
+    try:
+        path = (WORKDIR / relative_path).resolve()
+    except (OSError, RuntimeError) as exc:
+        raise ValueError("无法安全解析目标路径") from exc
     if not path.is_relative_to(WORKDIR):
         raise ValueError("路径不能跳出项目目录")
     return path
@@ -117,42 +121,74 @@ TOOL_HANDLERS = {
 DENY_LIST = {"delete_file": "示例程序不允许删除文件"}
 
 
-def check_permission(name: str, arguments: dict) -> tuple[bool, str]:
-    """在真正调用处理函数前，判断这次操作能否继续。"""
+class PermissionDecision(str, Enum):
+    ALLOW = "allow"
+    ASK = "ask"
+    DENY = "deny"
+
+
+def check_permission(name: str, arguments: dict) -> tuple[PermissionDecision, str]:
+    """只做策略判断，不在这里等待用户输入。"""
     if name in DENY_LIST:
-        return False, DENY_LIST[name]
+        return PermissionDecision.DENY, DENY_LIST[name]
+
+    expected_arguments = {
+        "read_file": {"path"},
+        "write_note": {"path", "content"},
+    }
+    if name not in expected_arguments:
+        return PermissionDecision.DENY, f"未知工具：{name}"
+    if set(arguments) != expected_arguments[name]:
+        return PermissionDecision.DENY, "参数字段不符合工具定义"
+
+    path = arguments["path"]
+    if not isinstance(path, str) or not path.strip():
+        return PermissionDecision.DENY, "path 必须是非空字符串"
+    if name == "write_note" and not isinstance(arguments["content"], str):
+        return PermissionDecision.DENY, "content 必须是字符串"
 
     try:
         if name == "read_file":
-            safe_read_path(arguments.get("path", ""))
+            safe_read_path(path)
         elif name == "write_note":
-            safe_write_path(arguments.get("path", ""))
-        else:
-            safe_path(arguments.get("path", ""))
+            safe_write_path(path)
     except ValueError as exc:
-        return False, str(exc)
+        return PermissionDecision.DENY, str(exc)
 
     if name == "write_note":
-        content = str(arguments.get("content", ""))
+        return PermissionDecision.ASK, "写入文件会改变工作区"
+
+    return PermissionDecision.ALLOW, ""
+
+
+def confirm_write(arguments: dict) -> bool:
+    """把确认绑定到本次显示的目标路径和内容。"""
+    try:
         choice = input(
-            f"准备写入 {arguments['path']}，完整内容如下：\n{content}\n允许吗？[y/N] "
+            f"准备写入 {arguments['path']}，完整内容如下：\n"
+            f"{arguments['content']}\n允许吗？[y/N] "
         ).strip().lower()
-        if choice not in {"y", "yes"}:
-            return False, "用户没有确认写入"
-
-    if name not in TOOL_HANDLERS:
-        return False, f"未知工具：{name}"
-
-    return True, ""
+    except EOFError:
+        # 非交互运行时没有人能确认，因此拒绝写入。
+        return False
+    return choice in {"y", "yes"}
 
 
 def run_tool(tool_call) -> str:
     name = tool_call.function.name
-    arguments = json.loads(tool_call.function.arguments or "{}")
-    allowed, reason = check_permission(name, arguments)
+    try:
+        arguments = json.loads(tool_call.function.arguments or "{}")
+    except (json.JSONDecodeError, TypeError):
+        return "Permission denied: 工具参数不是有效的 JSON"
+    if not isinstance(arguments, dict):
+        return "Permission denied: 工具参数必须是 JSON 对象"
 
-    if not allowed:
+    decision, reason = check_permission(name, arguments)
+
+    if decision is PermissionDecision.DENY:
         return f"Permission denied: {reason}"
+    if decision is PermissionDecision.ASK and not confirm_write(arguments):
+        return "Permission denied: 用户没有确认写入"
 
     try:
         return str(TOOL_HANDLERS[name](**arguments))

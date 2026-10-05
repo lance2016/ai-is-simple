@@ -101,9 +101,9 @@ def register_hook(event: str, callback) -> None:
 
 
 def trigger_hooks(event: str, *args):
-    """按注册顺序执行所有 Hook，并记住第一个阻止结果。
+    """按注册顺序运行所有回调，返回第一个不为 None 的结果。
 
-    这样权限 Hook 可以拦截工具，但日志 Hook 仍然有机会记录这次请求。
+    是否用这个结果改变流程，由触发 Hook 的调用位置决定。
     """
     blocked = None
     for callback in HOOKS[event]:
@@ -170,6 +170,7 @@ def run_tool(tool_call) -> str:
 
 
 def agent_loop(user_text: str) -> str:
+    # 这个示例只用它记录输入，忽略 Hook 的返回值。
     trigger_hooks("UserPromptSubmit", user_text)
     messages = [
         {
@@ -194,18 +195,21 @@ def agent_loop(user_text: str) -> str:
         messages.append(message.model_dump(exclude_none=True))
 
         if not message.tool_calls:
+            # Stop 在这里用于收尾记录；本示例不支持 Hook 要求继续运行。
             trigger_hooks("Stop", messages)
             return message.content or ""
 
         for tool_call in message.tool_calls:
             name = tool_call.function.name
             arguments = json.loads(tool_call.function.arguments or "{}")
+            # 本示例只有 PreToolUse 的返回值会决定是否执行工具。
             blocked = trigger_hooks("PreToolUse", name, arguments)
 
             if blocked:
                 result = str(blocked)
             else:
                 result = run_tool(tool_call)
+                # 当前 PostToolUse 用于观察结果，不能改变已完成的工具调用。
                 trigger_hooks("PostToolUse", name, result)
 
             messages.append(

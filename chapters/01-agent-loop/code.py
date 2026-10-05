@@ -54,12 +54,21 @@ def run_tool(tool_call) -> str:
     这里是 Harness 的工作：模型只提出请求，Python 真正执行动作。
     """
     name = tool_call.function.name
-    arguments = json.loads(tool_call.function.arguments or "{}")
+    try:
+        arguments = json.loads(tool_call.function.arguments or "{}")
+    except json.JSONDecodeError as exc:
+        # 工具参数来自模型，解析失败时把错误交回循环，而不是让进程直接崩溃。
+        return f"工具参数不是有效 JSON：{exc.msg}"
+
+    if not isinstance(arguments, dict):
+        return "工具参数必须是 JSON 对象。"
 
     if name == "get_today":
+        if arguments:
+            return "get_today 不接受参数。"
         return get_today()
 
-    return f"未知工具：{name}，参数：{arguments}"
+    return f"未知工具：{name}。"
 
 
 def agent_loop(user_text: str) -> str:
@@ -86,12 +95,20 @@ def agent_loop(user_text: str) -> str:
         )
 
         # 先保存模型这次的回答，下一轮才能看见完整上下文。
-        message = response.choices[0].message
+        choice = response.choices[0]
+        message = choice.message
         messages.append(message.model_dump(exclude_none=True))
 
         # 没有工具调用：模型已经可以直接回答，循环结束。
         if not message.tool_calls:
+            # 停止原因可能是长度上限或请求中断，不应把它当成正常最终答案。
+            if choice.finish_reason != "stop":
+                return f"模型未正常结束：{choice.finish_reason}"
             return message.content or ""
+
+        # 工具调用参数也可能在长度上限或请求中断时不完整，不能直接执行。
+        if choice.finish_reason != "tool_calls":
+            return f"工具调用未正常结束：{choice.finish_reason}"
 
         # 有工具调用：Python 执行工具，再把结果送回模型。
         # 下一轮不会重新询问用户，而是从工具结果继续判断。
