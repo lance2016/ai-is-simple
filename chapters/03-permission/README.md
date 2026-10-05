@@ -84,6 +84,12 @@ else:
 
 权限是程序代码，模型输出只是待检查的输入。
 
+### 面试里把“确认”与“授权”分开
+
+本例是单人本地程序，写入时弹窗确认足以演示控制点。多人服务不能只问“用户点了允许吗”，还要确认调用者身份、资源归属和操作范围；`user_id`、项目路径等身份信息应由服务端会话提供，不能相信模型自己填的参数。
+
+可以把防线按层讲清楚：工具参数和业务规则校验、基于身份与资源的授权、执行环境的文件和网络隔离。提示词能引导模型，确认框能让人审阅一次动作；两者都不能替代不可绕过的服务端检查。来自网页、仓库文件或 MCP Server 的内容也可能带有恶意指令，读到内容不代表信任内容。
+
 ### 这个示例到底允许什么？
 
 - `read_file` 只读根目录的教学文档和 `chapters/` 下的文件；`.env`、`.git` 等敏感路径会被拒绝；
@@ -125,20 +131,14 @@ uv run python chapters/03-permission/code.py
 
 观察第三个请求：模型可以提出 `delete_file`，但程序不会执行对应动作。
 
-## 今天只记住
+## 场景题：删除操作要经过哪些检查？
 
-> **模型负责提出请求，程序负责决定请求能不能执行。**
-
-权限检查应该位于“工具调用”和“工具执行”之间。
-
-## 想一想
-
-如果下一章又想增加日志、统计和结果检查，难道还要把这些判断一行行塞进 `agent_loop` 吗？
+如果下一步还要增加日志、统计和结果检查，哪些逻辑可以作为 Hook 扩展，哪些授权规则必须保证每次执行工具时都经过？
 
 <details>
 <summary>参考思路（先自己想一想，再展开）</summary>
 
-不需要。日志、统计、结果检查都是“每次经过这里都顺便做一下”的逻辑，不决定任务下一步。它们适合挂在循环的固定节点上，这就是下一章的 Hooks。
+日志和统计适合挂在固定节点上；关键授权则必须留在所有工具调用都会经过的执行边界。下一章用 Hook 演示一种扩展方式，也会讨论它的边界。
 
 </details>
 
@@ -146,3 +146,5 @@ uv run python chapters/03-permission/code.py
 
 - [learn-claude-code：s03 Permission](https://github.com/shareAI-lab/learn-claude-code/tree/main/s03_permission)
 - [DeepSeek Tool Calls 官方说明](https://api-docs.deepseek.com/guides/tool_calls/)
+- [Anthropic：How we contain Claude](https://www.anthropic.com/engineering/how-we-contain-claude)
+- [MCP：Tool Annotations as Risk Vocabulary](https://blog.modelcontextprotocol.io/posts/2026-03-16-tool-annotations/)

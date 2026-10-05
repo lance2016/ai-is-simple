@@ -32,6 +32,14 @@
 | [OpenAI：Evaluate Agent Workflows](https://developers.openai.com/api/docs/guides/agent-evals) | 必读 | 从 Trace 调试开始，再用 grader 给运行结果打分，并把案例转成可重复执行的 Dataset 和 eval run。 | [实战篇 06 · Agent 可观测性](../labs/06-observability/)、[实战篇 08 · Agent 效果评估](../labs/08-evaluation/)、[17 · Goal Loop](../chapters/17-goal-loop/) |
 | [Anthropic：Demystifying Evals for AI Agents](https://www.anthropic.com/engineering/demystifying-evals-for-ai-agents) | 推荐 | 学习如何定义任务、记录 Trace、组合多个 Grader，并同时检查最终结果和执行过程。 | [实战篇 08 · Agent 效果评估](../labs/08-evaluation/)、[17 · Goal Loop](../chapters/17-goal-loop/) |
 
+## 检索与 RAG：记忆不是全部
+
+本项目的 Memory 章节讲跨任务信息怎样保存和召回，当前没有实现完整的知识库检索链路。面试准备还可以补上文档更新、切块、关键词与向量召回、重排、引用和检索评估；不要把“用了向量库”当作答案。
+
+| 资料 | 适合看什么 | 对应主题 |
+| --- | --- | --- |
+| [Anthropic：Contextual Retrieval](https://www.anthropic.com/engineering/contextual-retrieval) | 对照关键词（BM25）与向量检索如何互补，以及重排带来的质量、延迟和成本取舍。文章里的效果数字来自其特定实验，不应直接当作所有数据集的保证。 | 扩展阅读；当前没有配套的 RAG 实战 |
+
 ## Workflow Runtime：深入阅读 Temporal
 
 | 资料 | 推荐程度 | 适合看什么 | 对应章节 |
@@ -46,6 +54,14 @@
 | --- | --- | --- | --- |
 | [learn-claude-code](https://github.com/shareAI-lab/learn-claude-code) | 推荐 | 对照另一套从 Agent Loop 到 Harness 机制的教程。当前主线是根目录 `s01`～`s17`；`docs/` 和 `agents/` 里保留旧版，章节编号不要混用。 | [01 · Agent Loop](../chapters/01-agent-loop/)、[09 · Memory](../chapters/09-memory/)、[15 · Agent Harness](../chapters/15-integrated-harness/) |
 | [Pi](https://github.com/earendil-works/pi) · [官方文档](https://pi.dev/) · [安全说明](https://github.com/earendil-works/pi/blob/main/packages/coding-agent/docs/security.md) | 深入 | 看 TypeScript / Node.js Harness 如何扩展 Extension、Session 和 Skills。Pi 默认不会在每次工具调用前请求确认；项目资源的信任确认也不限制工具访问路径，本项目额外实现的工作区限制和授权确认属于自己的 Harness 设计。 | [15 · Agent Harness](../chapters/15-integrated-harness/)、[实战篇 09 · Skill Loading](../labs/09-skill-loading/) |
+
+### Agent 安全
+
+| 资料 | 适合看什么 | 对应章节 |
+| --- | --- | --- |
+| [Anthropic：How we contain Claude](https://www.anthropic.com/engineering/how-we-contain-claude) · [Claude Code Sandboxing](https://www.anthropic.com/engineering/claude-code-sandboxing) | 从模型行为、外部内容和执行环境三个层面理解纵深防御；授权提示不能替代文件系统或网络隔离。 | [03 · Permission](../chapters/03-permission/)、[实战篇 01 · Coding Agent](../labs/01-mini-coding-agent/) |
+| [MCP：Tool Annotations as Risk Vocabulary](https://blog.modelcontextprotocol.io/posts/2026-03-16-tool-annotations/) | 工具注解是提示，不是权限合同；不可信 Server 的 `readOnlyHint` 不能成为跳过本地策略检查的理由。 | [14 · MCP](../chapters/14-mcp-plugin/)、[实战篇 04 · MCP](../labs/04-mcp/) |
+| [MCP Skills：安全考虑](https://skills.extensions.modelcontextprotocol.io/specification/stable/skills) | 远程 Skill 内容是不可信输入，来源标识和代码执行审批仍由 Host 负责。 | [07 · Skills](../chapters/07-skill-loading/)、[实战篇 09 · Skill Loading](../labs/09-skill-loading/) |
 
 ### 工具协议与 Skills
 

@@ -4,8 +4,6 @@
 
 > **一句话总结：会话内记忆让当前任务接得上，跨会话记忆让后续任务用得上过去的信息。**
 
-**本章新增：** 一个最小的长期记忆存储，以及写入、检索和使用记忆的流程。
-
 第 08 章的 Context Compact 处理当前对话太长的问题。Memory 处理的是另一件事：当前会话结束后，哪些信息值得留下，之后又如何找到它。
 
 ## 记忆常说几层？
@@ -64,31 +62,22 @@
 
 读取时先按用户、项目或团队等范围隔离，再根据当前任务检索。常见做法包括关键词检索、向量语义检索、实体关系检索，或把几种信号合并排序。最后只把有限的证据交给模型，并保留来源，方便核对。
 
-## 常见记忆框架
+## 先定信息边界，再选存储
 
-截至 **2026 年 9 月**，比较常见的项目横跨两类：直接提供记忆存取能力的框架，以及自带记忆机制的 Agent 框架。GitHub 星数可以粗略反映关注度，但不等于实际部署量。
+不要从“我选哪个向量数据库”开始。先判断信息归谁、保留多久、怎样更新、出错后谁能删除，以及当前任务怎样找到它。
 
-| 项目 | 它主要提供什么 | 适合什么情况 |
+| 需求 | 更像哪类状态 | 设计时先确认 |
 | --- | --- | --- |
-| [Mem0](https://github.com/mem0ai/mem0) | 可单独接入的记忆层，负责提取、保存和检索用户或项目记忆 | 想给现有 Agent 增加跨会话记忆 |
-| [LangGraph](https://github.com/langchain-ai/langgraph) | Agent 编排框架；checkpointer 保存当前 thread，store 保存跨 thread 信息 | 已用 LangGraph，需要自己组合短期状态和长期存储 |
-| [Graphiti / Zep](https://github.com/getzep/graphiti) | 保存带来源和有效时间的实体、关系与事件 | 事实关系多、状态常变化，还要追溯过去 |
-| [Cognee](https://github.com/topoteretes/cognee) | 把文档、代码和对话整理成可查询的知识图谱 | 要把多个来源汇成项目或团队知识库 |
-| [Hindsight](https://github.com/vectorize-io/hindsight) | 分开组织事实、经历、观察结论和心智模型，并提供 retain / recall / reflect 流程 | 希望 Agent 能从多次经验中归纳规律 |
-| [Letta Code](https://github.com/letta-ai/letta-code) | 完整的持久化 Agent Harness；MemFS 用可版本管理的文件组织常驻记忆和按需材料 | 想研究 Agent 如何自行维护上下文和长期记忆 |
-| [OpenAI Agents SDK](https://openai.github.io/openai-agents-python/) | Session 保存对话历史；Sandbox Agent 的 Memory 能为后续运行整理经验，仍处于 Beta | 已采用该 SDK，想先用它提供的会话和沙箱记忆能力 |
+| 接着同一条对话继续做事 | Session / checkpoint | 线程边界、持久化与恢复 |
+| 以后任务可复用的用户或项目事实 | 长期 Memory | 来源、时间、冲突、隔离与删除 |
+| 从大量外部文档中找有依据的片段 | RAG / 检索 | 文档更新、切分、召回、排序和引用 |
+| 让模型按固定步骤执行规范 | Skill / 流程指引 | 内容可信度、版本和工具权限 |
 
-这些项目解决的问题不同，不能只按“谁的记忆最好”排成一个榜单。Mem0 更像可嵌入的记忆服务；LangGraph 给应用状态和存储的接口；Letta 把记忆做成 Agent 本身的一部分。尤其要注意：**Mem0 的实体匹配不等于完整知识图谱。** 当前开源检索依赖配置的向量库，可选重排，并用实体重合提升排序；Graphiti 才是专门维护可查询时序关系图的路线。[Mem0 开源架构说明](https://github.com/mem0ai/mem0/blob/main/docs/core-concepts/how-it-works.mdx)、[Graphiti 官方说明](https://github.com/getzep/graphiti)
+Memory 和 RAG 可以共用关键词、向量或混合检索，但它们解决的问题不同：Memory 管理跨任务仍有用、可能变化的事实；RAG 面向一个可检索的内容集合，重点是找回相关证据。面试时要说明来源、时效和权限，而不只是说“把内容放进向量库”。
 
-## 近期系统走向
+不同项目会把这些能力放在不同层：有的提供记忆抽取和召回服务，有的管理 Agent 状态，有的偏时间关系图，有的把记忆做成 Agent 的持久工作区。产品能力和版本变化很快；要比较具体框架时，先说明需求，再查它当前官方文档。扩展阅读页保留了一组入口，正文不把短期产品动态当作稳定原理。
 
-不同路线仍在演进，主要变化集中在提取、时间理解、后台整理和检索策略：
-
-MemOS 探索把不同类型的记忆、生命周期和调度放进统一的管理层；LeanMem 研究如何根据问题选择记忆类型和检索预算。它们代表系统架构与检索策略的探索，不是和 Mem0 一样的同类 SDK。[MemOS](https://github.com/MemTensor/MemOS/blob/main/docs/en/open_source/home/memos_intro.md)、[LeanMem（2026 预印本）](https://arxiv.org/abs/2608.03463)
-
-Mem0 的 2026 更新体现了几项变化：抽取阶段用一次模型调用添加独立事实，让新旧状态都能留下；检索融合语义、关键词和实体匹配；时间感知区分事实何时成立，并按问题调整排序。Memory Decay 还会根据记忆最近被使用的时间轻调排序，但不会删除旧记忆。后台 Dream 则能合并重复项、标记已被取代的事实，并归纳多条记录；它目前属于 Pro 和 Enterprise 计划，不是开源 SDK 默认具备的能力。[Mem0：Token-Efficient Memory Algorithm](https://mem0.ai/blog/mem0-the-token-efficient-memory-algorithm)、[Mem0：Temporal Reasoning](https://mem0.ai/blog/introducing-temporal-reasoning-in-mem0)、[Mem0：Memory Decay](https://mem0.ai/blog/introducing-memory-decay-in-mem0)、[Mem0：Dream](https://mem0.ai/blog/dream-background-memory-consolidation-for-ai-agents)
-
-这些系统都在增加提取、召回和维护环节，但记忆是否有用，最终要看它能否帮助 Agent 更好地完成任务。2026 年的 VibeMemBench 用真实仓库任务和可执行测试评估 Coding Agent 记忆；论文报告称，现有记忆系统在多数 solver 组合中未能超过不使用记忆的基线。这提醒我们：记住一条信息和正确运用它是两件事。[VibeMemBench（2026 预印本）](https://arxiv.org/abs/2609.23570)
+评估也应回答“记忆是否帮任务做得更好”，而不只是“能不能复述存过的内容”。可以在同一组任务上比较有记忆和无记忆的正确率、工具调用数、耗时和 token，并检查过期信息、跨用户泄漏及删除路径。
 
 ## 在项目中怎样用记忆
 
@@ -123,11 +112,7 @@ uv run python chapters/09-memory/code.py
 
 输入一条跨任务有用的项目约定，退出后重新运行，再询问这条约定。完整 Coding Agent 中的会话历史和长期记忆如何配合，可继续看[实战篇 02：长期记忆](../../labs/02-memory/)。
 
-## 今天只记住
-
-> **短期记忆维护当前任务；长期记忆筛选跨任务有用的信息，并按需召回。**
-
-## 想一想
+## 情境题：记忆和当前配置冲突时怎么办？
 
 项目把测试命令从 `pytest` 改成了 `uv run pytest`。下次任务问“测试怎么跑”时，记忆系统如何避免把旧命令当成当前事实？
 
@@ -156,4 +141,5 @@ uv run python chapters/09-memory/code.py
 - [LeanMem（2026 预印本）](https://arxiv.org/abs/2608.03463)
 - [VibeMemBench（2026 预印本）](https://arxiv.org/abs/2609.23570)
 - [DolphinBench（2026 预印本）](https://arxiv.org/abs/2609.24971)
+- [Anthropic：Effective context engineering for AI agents](https://www.anthropic.com/engineering/effective-context-engineering-for-ai-agents)
 - [learn-claude-code：s09 Memory](https://github.com/shareAI-lab/learn-claude-code/tree/main/s09_memory)
