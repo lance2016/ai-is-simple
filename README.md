@@ -92,7 +92,7 @@
 | 章节 | 面试时要能讲清楚 |
 | --- | --- |
 | [00 · Chat Completion](./chapters/00-chat-completion/) | 一次请求看到了什么；多轮对话为什么需要应用保存状态 |
-| [01 · Agent Loop](./chapters/01-agent-loop/) | 工具调用怎样往返；循环为什么要有停止条件 |
+| [01 · Agent Loop](./chapters/01-agent-loop/) | Agent 执行循环的四个问题；以 ReAct 为例看工具调用往返和停止条件 |
 | [02 · Tool Use](./chapters/02-tool-use/) | 工具定义、参数、程序分发和结果回传各由谁负责 |
 | [03 · Permission](./chapters/03-permission/) | 模型提出请求后，程序怎样验证权限和限制影响范围 |
 | [15 · Agent Harness](./chapters/15-integrated-harness/) | 怎样把模型、工具、状态和安全边界组织成可维护的应用 |
