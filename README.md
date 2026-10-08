@@ -101,7 +101,7 @@
 
 | 问题 | 章节 | 面试中可展开的取舍 |
 | --- | --- | --- |
-| 循环里开始堆日志、策略和检查 | [04 · Hooks](./chapters/04-hooks/) | 扩展点和必须执行的安全策略有什么区别 |
+| 循环里开始堆日志、策略和检查 | [04 · Hooks](./chapters/04-hooks/) | Tool 由模型选择，Hook 由系统到点执行；生命周期节点怎么解耦循环 |
 | 多步骤任务容易漏项，或需要中断后恢复 | [05 · Planning](./chapters/05-planning/)、[10 · Tasks](./chapters/10-tasks/)、[16 · Workflow](./chapters/16-workflow-runtime/)、[17 · Goal Loop](./chapters/17-goal-loop/) | 自适应计划、持久任务、固定流程和验收条件分别解决什么问题 |
 | 对话变长、需要带入过去信息 | [07 · Skills](./chapters/07-skill-loading/)、[08 · Context](./chapters/08-context-compact/)、[09 · Memory](./chapters/09-memory/) | 指令、当前对话和跨会话记忆不能混成一类 |
 | 需要委派、后台执行、定时触发或多人协作 | [06 · Subagents](./chapters/06-subagents/)、[11 · Background Tasks](./chapters/11-background-tasks/)、[12 · Cron](./chapters/12-cron-scheduler/)、[13 · Teams](./chapters/13-agent-teams/) | 延迟、协调成本、任务生命周期和重复执行风险如何权衡 |
