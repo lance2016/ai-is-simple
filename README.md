@@ -266,6 +266,7 @@ ai-is-simple/
 ├── Agents.md
 ├── STYLE_GUIDE.md
 ├── SOURCES.md
+├── ROADMAP.md
 ├── assets/
 │   ├── readme-hero.png
 │   ├── learning-roadmap.png
@@ -420,6 +421,7 @@ Phoenix 相关依赖放在独立的 uv 依赖组里，基础实战不需要安�
 - 配图规范：[STYLE_GUIDE.md](./STYLE_GUIDE.md)
 - 项目协作规范：[Agents.md](./Agents.md)
 - 参考来源：[SOURCES.md](./SOURCES.md)
+- 项目进度：[ROADMAP.md](./ROADMAP.md)
 
 ---
 
