@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""第 13 章：用线程、任务认领和消息总线演示 Agent Teams。"""
+"""第 13 章：每个队友用自己的 messages 调用模型，靠任务板和收件箱协作。"""
 
 from __future__ import annotations
 
@@ -23,7 +23,11 @@ if not API_KEY:
 client = OpenAI(api_key=API_KEY, base_url=BASE_URL)
 MAX_TURNS = 8
 MAX_TEAMMATES = 4
+# Each task costs one teammate model call, so this also caps the team's spend.
 MAX_TEAM_TASKS = 8
+TEAMMATE_CALL_TIMEOUT = 30.0
+# Longer than the teammate call timeout, so a task in progress normally settles within one wait.
+COLLECT_TIMEOUT = 60.0
 
 
 class TaskBoard:
@@ -56,17 +60,10 @@ class TaskBoard:
                     return task.copy()
         return None
 
-    def complete(self, task_id: str, owner: str) -> str:
+    def finish(self, task_id: str, status: str) -> None:
+        """Close a claimed task as completed or failed."""
         with self.changed:
-            task = self.tasks.get(task_id)
-            if task is None:
-                return f"找不到任务：{task_id}"
-            if task["owner"] != owner:
-                return f"任务负责人是 {task['owner']}，不是 {owner}"
-            if task["status"] != "in_progress":
-                return f"任务当前状态是 {task['status']}，不能再次完成"
-            task["status"] = "completed"
-            return f"{owner} 完成了 {task['subject']}"
+            self.tasks[task_id]["status"] = status
 
     def render(self) -> str:
         with self.changed:
@@ -78,9 +75,13 @@ class TaskBoard:
                 for task in self.tasks.values()
             )
 
-    def all_completed(self) -> bool:
+    def all_settled(self) -> bool:
+        # `failed` counts as settled, or one broken teammate keeps the Lead waiting.
         with self.changed:
-            return all(task["status"] == "completed" for task in self.tasks.values())
+            return all(
+                task["status"] in ("completed", "failed")
+                for task in self.tasks.values()
+            )
 
 
 class MessageBus:
@@ -90,7 +91,7 @@ class MessageBus:
         self.messages: list[dict] = []
         self.lock = threading.Lock()
 
-    def send(self, sender: str, content: str, message_type: str = "result") -> None:
+    def send(self, sender: str, content: str, message_type: str) -> None:
         with self.lock:
             self.messages.append(
                 {"from": sender, "type": message_type, "content": content}
@@ -108,6 +109,37 @@ class MessageBus:
         )
 
 
+def run_teammate(name: str, subject: str) -> tuple[str, str]:
+    """Run one task in the teammate's own context; return (status, text)."""
+    # Built per task inside the teammate thread. The SDK client is safe to share
+    # across threads; a messages list is not, so the Lead's list never comes in here.
+    teammate_messages = [
+        {
+            "role": "system",
+            "content": (
+                f"你是团队成员 {name}，负责独立完成 Lead 分给你的一项任务。"
+                "你没有工具，也看不到 Lead 和其他队友的对话；"
+                "只根据任务本身，用不超过三句话给出结果。"
+                "信息不足时直接说明缺什么，不要编造。"
+            ),
+        },
+        {"role": "user", "content": subject},
+    ]
+    try:
+        # Short timeout and no SDK retries: a stuck call has to end as `failed`
+        # instead of holding the task in in_progress.
+        response = client.with_options(
+            timeout=TEAMMATE_CALL_TIMEOUT, max_retries=0
+        ).chat.completions.create(model=MODEL, messages=teammate_messages)
+        choice = response.choices[0]
+        if choice.finish_reason != "stop" or not choice.message.content:
+            return "failed", f"模型没有正常给出结果（finish_reason={choice.finish_reason}）"
+        return "completed", choice.message.content
+    except Exception as exc:
+        # Only the type goes back to the Lead; raw API errors may echo request details.
+        return "failed", f"模型调用出错（{type(exc).__name__}）"
+
+
 class TeamRuntime:
     def __init__(self):
         self.board = TaskBoard()
@@ -120,6 +152,8 @@ class TeamRuntime:
     def create_tasks(self, subjects: list[str]) -> str:
         if self.stop_event.is_set():
             return "Error: 团队正在关闭，不能再创建任务"
+        if len(self.board.tasks) + len(subjects) > MAX_TEAM_TASKS:
+            return f"Error: 任务板最多放 {MAX_TEAM_TASKS} 项任务，每项都要花一次模型调用"
         ids = [self.board.create(subject) for subject in subjects]
         return "已创建团队任务：" + "、".join(ids)
 
@@ -147,21 +181,27 @@ class TeamRuntime:
             if task is None:
                 time.sleep(0.1)
                 continue
-            # 用短暂等待模拟队友在自己的 Agent Loop 中工作。
-            time.sleep(0.3)
+            print(f"[{name}] 认领 {task['id']}：{task['subject']}")
+            status, text = run_teammate(name, task["subject"])
             with self.changed:
-                result = self.board.complete(task["id"], name)
-                self.bus.send(name, result, "result")
-                self.bus.send(name, "等待下一项任务", "idle_notification")
+                self.board.finish(task["id"], status)
+                self.bus.send(name, f"{task['id']}《{task['subject']}》：{text}", status)
                 self.changed.notify_all()
+            print(f"[{name}] {task['id']} -> {status}")
 
-    def collect_messages(self, timeout: float = 5.0) -> str:
+    def collect_messages(self, timeout: float = COLLECT_TIMEOUT) -> str:
+        # With no running teammate nothing can change; waiting would only stall the Lead.
+        if not self.workers or self.stop_event.is_set():
+            return (
+                f"{self.bus.read_for_lead()}\n没有运行中的队友；任务板当前状态：\n"
+                f"{self.board.render()}"
+            )
         with self.changed:
-            completed = self.changed.wait_for(self.board.all_completed, timeout=timeout)
+            settled = self.changed.wait_for(self.board.all_settled, timeout=timeout)
             messages = self.bus.read_for_lead()
-        if completed:
+        if settled:
             return messages
-        return f"{messages}\n等待超时，仍未完成的任务：\n{self.board.render()}"
+        return f"{messages}\n等待超时，任务板当前状态：\n{self.board.render()}"
 
     def shutdown(self) -> str:
         self.stop_event.set()
@@ -222,7 +262,7 @@ TOOLS = [
         "type": "function",
         "function": {
             "name": "create_team_tasks",
-            "description": "创建共享任务板上的多个独立任务。",
+            "description": "创建共享任务板上的多个独立任务；每项任务会花一次队友模型调用。",
             "parameters": {
                 "type": "object",
                 "properties": {
@@ -241,7 +281,7 @@ TOOLS = [
         "type": "function",
         "function": {
             "name": "spawn_teammates",
-            "description": "启动多个持久队友线程来认领 ready task。",
+            "description": "启动队友线程；队友认领任务后用自己的 messages 调用一次模型。",
             "parameters": {
                 "type": "object",
                 "properties": {
@@ -268,7 +308,7 @@ TOOLS = [
         "type": "function",
         "function": {
             "name": "collect_team_messages",
-            "description": "收取队友发给 Lead 的结果和 idle 通知。",
+            "description": "等队友处理完任务，收取它们发给 Lead 的结果或失败消息。",
             "parameters": {"type": "object", "properties": {}},
         },
     },
@@ -298,8 +338,9 @@ def agent_loop(user_text: str) -> str:
             "content": (
                 "你是 Lead Agent。简单问候、闲聊和无需协作的问题直接回答。"
                 "面对彼此独立且值得并行的任务，先创建任务，再启动队友；"
-                "收集并汇总结果后请求关闭团队。不要把任务板的 completed 当作结果已验证。"
-                "这是教学示例，队友只模拟工作，不调用模型，也不修改文件。"
+                "收集并汇总结果后请求关闭团队。"
+                "队友没有工具，每项任务只调用一次模型，所以任务标题要写成能独立回答的完整问题。"
+                "failed 的任务要如实告诉用户；completed 只表示队友交了结果，不代表结果已验证。"
             ),
         },
         {"role": "user", "content": user_text},
