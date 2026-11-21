@@ -130,14 +130,20 @@ def agent_loop(task):
 | LLM | 根据上下文做决策 | 第 00 章 |
 | Agent Loop | 驱动多轮交互 | 第 01 章 |
 | Tool | 执行业务动作 | 第 02 章 |
+| Permission | 决定一次调用能不能执行 | 第 03 章 |
 | Hook | 扩展 Agent 的生命周期 | 本章 |
+| Harness | 把上面这些组织成一个应用 | 第 15 章 |
 | Workflow | 用代码编排固定流程 | 第 16 章 |
 
-前五个组成一个能用的 Agent；Workflow 站在外面，用代码约束它。第 03 章的权限检查原本直接写在循环里，本章把它挪到了 `before_tool_call` 上，这就是 Hook 的典型用法。
+前五个是每个 Agent 都有的主干。Hook 是可选的扩展口，循环里的杂事多起来再加。Harness 是把它们装在一起的那层程序。Workflow 站在外面，用代码约束 Agent。
+
+第 03 章把“这一步要不要先问用户”直接写在 `run_tool()` 里。本章把这层**策略**挪到了 `before_tool_call` 上，以后换一套确认规则，不用再改工具代码。
+
+路径范围这类**硬边界**没有挪。它们仍在工具函数里，挂不挂 Hook 都会执行。
 
 ## 用 DeepSeek 跑起来
 
-完整代码在 [`code.py`](./code.py)。它注册了几个 Hook：记录用户输入、工具执行前做权限检查和日志、工具返回后检查结果长度、结束时打印消息数。读文件可以直接执行，写笔记会先要求确认，删除会被拒绝。
+完整代码在 [`code.py`](./code.py)。它注册了几个 Hook：记录用户输入、工具执行前做权限检查和日志、工具返回后检查结果长度、结束时打印消息数。读文件可以直接执行；写笔记会先显示完整内容并要求确认；删除会被拒绝。
 
 在 `.env` 配好 DeepSeek API Key 后运行：
 
@@ -152,7 +158,7 @@ blocked = trigger_hooks("PreToolUse", name, arguments)
 if blocked:
     result = blocked
 else:
-    result = run_tool(tool_call)
+    result = run_tool(name, arguments)
     trigger_hooks("PostToolUse", name, result)
 ```
 
@@ -167,7 +173,7 @@ else:
 - **适合 Hook**：跨工具、每次都要发生的逻辑，比如日志、trace、统计、memory 保存。
 - **不必用 Hook**：只在一处用到、又直接影响核心流程的简单判断，写在循环里反而更清楚。
 - **代价**：Hook 是隐式调用，读循环代码时看不出到底挂了什么；多个 Hook 的执行顺序和异常也要额外管理。
-- **别把安全全押在 Hook 上**：可选的回调可能漏注册或被移除。真正的授权要放在每次执行都必经的工具入口；Lab 01 就把路径和权限检查写在 Python Harness 里。
+- **别把安全全押在 Hook 上**：可选的回调可能漏注册或被移除。所以本章代码把读取范围、写入目录这些硬边界留在工具函数里，Hook 只管“要不要先问用户”。把权限 Hook 整个摘掉，`.env` 照样读不到，笔记也写不出 `notes/`，少掉的只是确认这一步。Lab 01 更进一步：不提供工具执行前的挂载点，授权全部走工具自己的入口。
 
 ## 今天只记住
 

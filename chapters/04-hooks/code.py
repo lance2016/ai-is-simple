@@ -25,7 +25,7 @@ TOOLS = [
         "type": "function",
         "function": {
             "name": "read_file",
-            "description": "读取项目内的文本文件。",
+            "description": "读取项目内允许访问的文本文件，不读取 .env 等敏感文件。",
             "parameters": {
                 "type": "object",
                 "properties": {"path": {"type": "string"}},
@@ -37,7 +37,7 @@ TOOLS = [
         "type": "function",
         "function": {
             "name": "write_note",
-            "description": "向项目内写入一条笔记。执行前需要用户确认。",
+            "description": "向 notes/ 目录写入一条笔记。执行前需要用户确认。",
             "parameters": {
                 "type": "object",
                 "properties": {
@@ -63,19 +63,44 @@ TOOLS = [
 ]
 
 
+# Hard boundaries live inside the tool functions: every call passes through them,
+# whether or not any hook is registered. They are the same limits as chapter 03.
+SENSITIVE_FILES = {".env", ".env.local", ".env.production", ".env.development"}
+ROOT_READABLE_FILES = {"README.md", "Agents.md", "SOURCES.md", "STYLE_GUIDE.md"}
+
+
 def safe_path(relative_path: str) -> Path:
+    if not isinstance(relative_path, str) or not relative_path.strip():
+        raise ValueError("path 必须是非空字符串")
     path = (WORKDIR / relative_path).resolve()
     if not path.is_relative_to(WORKDIR):
         raise ValueError("路径不能跳出项目目录")
     return path
 
 
+def safe_read_path(relative_path: str) -> Path:
+    path = safe_path(relative_path)
+    if path.name in SENSITIVE_FILES or any(part.startswith(".git") for part in path.parts):
+        raise ValueError("出于安全考虑，不能读取 .env 或 .git 等敏感路径")
+    is_root_doc = path.parent == WORKDIR and path.name in ROOT_READABLE_FILES
+    if not (is_root_doc or (WORKDIR / "chapters") in path.parents):
+        raise ValueError("示例只允许读取根目录教学文档或 chapters/ 下的文件")
+    return path
+
+
+def safe_write_path(relative_path: str) -> Path:
+    path = safe_path(relative_path)
+    if (WORKDIR / "notes") not in path.parents:
+        raise ValueError("写入范围仅限 notes/ 目录")
+    return path
+
+
 def read_file(path: str) -> str:
-    return safe_path(path).read_text(encoding="utf-8")[:8000]
+    return safe_read_path(path).read_text(encoding="utf-8")[:8000]
 
 
 def write_note(path: str, content: str) -> str:
-    file_path = safe_path(path)
+    file_path = safe_write_path(path)
     file_path.parent.mkdir(parents=True, exist_ok=True)
     file_path.write_text(content, encoding="utf-8")
     return f"已写入 {path}"
@@ -118,22 +143,26 @@ def prompt_log_hook(user_text: str):
 
 
 def permission_hook(name: str, arguments: dict):
-    """Permission 从循环里搬到了 PreToolUse Hook。"""
+    """可插拔的策略：这一步要不要先问用户。路径范围不归它管，那是工具函数自己的硬边界。"""
     if name == "delete_file":
         return "Permission denied：示例程序不允许删除文件"
 
-    try:
-        safe_path(arguments.get("path", ""))
-    except ValueError as exc:
-        return f"Permission denied：{exc}"
-
     if name == "write_note":
-        choice = input(f"准备写入 {arguments['path']}，允许吗？[y/N] ").strip().lower()
+        try:
+            safe_write_path(arguments.get("path"))
+        except ValueError as exc:
+            # No point asking the user to confirm a write that the tool will refuse anyway.
+            return f"Permission denied：{exc}"
+        try:
+            choice = input(
+                f"准备写入 {arguments['path']}，完整内容如下：\n"
+                f"{arguments.get('content', '')}\n允许吗？[y/N] "
+            ).strip().lower()
+        except EOFError:
+            # Nobody can confirm in a non-interactive run, so refuse.
+            return "Permission denied：用户没有确认写入"
         if choice not in {"y", "yes"}:
             return "Permission denied：用户没有确认写入"
-
-    if name not in TOOL_HANDLERS:
-        return f"Permission denied：未知工具 {name}"
     return None
 
 
@@ -157,9 +186,15 @@ register_hook("PostToolUse", large_output_hook)
 register_hook("Stop", summary_hook)
 
 
-def run_tool(tool_call) -> str:
-    name = tool_call.function.name
-    arguments = json.loads(tool_call.function.arguments or "{}")
+def parse_arguments(tool_call) -> dict | None:
+    try:
+        arguments = json.loads(tool_call.function.arguments or "{}")
+    except (json.JSONDecodeError, TypeError):
+        return None
+    return arguments if isinstance(arguments, dict) else None
+
+
+def run_tool(name: str, arguments: dict) -> str:
     handler = TOOL_HANDLERS.get(name)
     if handler is None:
         return f"未知工具：{name}"
@@ -191,24 +226,34 @@ def agent_loop(user_text: str) -> str:
             tools=TOOLS,
             tool_choice="auto",
         )
-        message = response.choices[0].message
+        choice = response.choices[0]
+        message = choice.message
         messages.append(message.model_dump(exclude_none=True))
 
         if not message.tool_calls:
             # Stop 在这里用于收尾记录；本示例不支持 Hook 要求继续运行。
             trigger_hooks("Stop", messages)
+            if choice.finish_reason != "stop":
+                return f"模型未正常结束：{choice.finish_reason}"
             return message.content or ""
+
+        # Same rule as chapter 01: never run arguments that may have been cut off.
+        if choice.finish_reason != "tool_calls":
+            return f"工具调用未正常结束：{choice.finish_reason}"
 
         for tool_call in message.tool_calls:
             name = tool_call.function.name
-            arguments = json.loads(tool_call.function.arguments or "{}")
-            # 本示例只有 PreToolUse 的返回值会决定是否执行工具。
-            blocked = trigger_hooks("PreToolUse", name, arguments)
+            arguments = parse_arguments(tool_call)
+            if arguments is None:
+                blocked = "工具参数必须是合法的 JSON 对象"
+            else:
+                # 本示例只有 PreToolUse 的返回值会决定是否执行工具。
+                blocked = trigger_hooks("PreToolUse", name, arguments)
 
             if blocked:
                 result = str(blocked)
             else:
-                result = run_tool(tool_call)
+                result = run_tool(name, arguments)
                 # 当前 PostToolUse 用于观察结果，不能改变已完成的工具调用。
                 trigger_hooks("PostToolUse", name, result)
 
