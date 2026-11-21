@@ -195,13 +195,24 @@ class BashTool(Tool):
     parameters = {"command": {"type": "string", "description": "要运行的 Bash 命令"}}
     required = ("command",)
 
-    # 规则只有一句话：单条命令、不含 shell 操作符、首词在白名单里，才算只读。
-    # 其余一律请求授权。规则简单意味着不容易看漏，也不容易被花式写法绕过。
+    # 只读要同时满足三条：没有 shell 操作符、命令在白名单里、参数既不出工作区也不带危险选项。
+    # 其余一律请求授权。只看首词是不够的：git branch -D、rg --pre 的首词都是“只读”的。
     READ_ONLY = {
         "ls", "pwd", "cat", "head", "tail", "wc", "file", "tree", "grep", "rg",
         "git status", "git diff", "git log", "git branch",
     }
-    SHELL_OPERATORS = ("|", ">", "<", ";", "&", "`", "$(")
+    # "$" and "{" are here because the shell expands $HOME and {a,b} after we have checked the text.
+    SHELL_OPERATORS = ("|", ">", "<", ";", "&", "`", "$", "{")
+    # Options that make a whitelisted command write a file or run another program.
+    UNSAFE_OPTIONS = {
+        "rg": ("--pre", "--pre-glob", "--hostname-bin", "--search-zip", "-z"),
+        "tree": ("-o",),
+        "file": ("--compile", "-C"),
+        "git diff": ("--output", "--ext-diff"),
+        "git log": ("--output", "--ext-diff"),
+    }
+    # git branch creates, renames or deletes with almost any argument, so only plain listing is read-only.
+    BRANCH_LISTING = {"-a", "-r", "-v", "-vv", "--all", "--remotes", "--list", "--show-current"}
     BLOCKED_WORDS = (".env", ".git/", ".ssh", "/etc/", "sudo")
     TIMEOUT_SECONDS = 20
     MAX_OUTPUT = 8000
@@ -215,8 +226,40 @@ class BashTool(Tool):
             return False
         if not parts:
             return False
-        # 白名单里既有单词（ls），也有两词前缀（git status），一次比较覆盖两种。
-        return parts[0] in self.READ_ONLY or " ".join(parts[:2]) in self.READ_ONLY
+        # 白名单里既有单词（ls），也有两词前缀（git status）。
+        name = parts[0] if parts[0] in self.READ_ONLY else " ".join(parts[:2])
+        if name not in self.READ_ONLY:
+            return False
+        arguments = parts[len(name.split()):]
+        if name == "git branch":
+            return all(argument in self.BRANCH_LISTING for argument in arguments)
+        return not any(
+            self._leaves_workspace(argument) or self._is_unsafe_option(name, argument)
+            for argument in arguments
+        )
+
+    @staticmethod
+    def _leaves_workspace(argument: str) -> bool:
+        """绝对路径、~ 和 .. 都可能指向工作区外面；read 工具有 Workspace 把关，bash 只能看参数。"""
+        # A short option with an attached value (-f/abs/path) cannot be told apart from a relative one.
+        if argument.startswith("-") and not argument.startswith("--") and "/" in argument:
+            return True
+        value = argument.split("=", 1)[-1]  # --include=src/*.py -> src/*.py
+        if value.startswith(("/", "~")):
+            return True
+        # ".*" is a glob that also matches "..", so treat it like "..".
+        return any(part == ".." or part[:2] in (".*", ".?", ".[") for part in value.split("/"))
+
+    def _is_unsafe_option(self, name: str, argument: str) -> bool:
+        option = argument.split("=", 1)[0]
+        for unsafe in self.UNSAFE_OPTIONS.get(name, ()):
+            if unsafe.startswith("--"):
+                # git accepts unique abbreviations such as --outp, so compare by prefix.
+                if option.startswith("--") and len(option) > 2 and unsafe.startswith(option):
+                    return True
+            elif option.startswith("-") and not option.startswith("--") and unsafe[1] in option:
+                return True  # also catches clustered short flags such as -az
+        return False
 
     def confirm_prompt(self, workspace: Workspace, command: str) -> str | None:
         if any(word in command.casefold() for word in self.BLOCKED_WORDS):

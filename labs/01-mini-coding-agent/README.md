@@ -1,12 +1,14 @@
 # 实战篇 01：Coding Agent 搭建
 
+![Mini Coding Agent 的工作结构](../../assets/lab-01-mini-coding-agent.png)
+
 > **一句话总结：Coding Agent 不神秘，就是「模型循环 + 一组工具 + 一个安全的工作区」，再把每一步摆到浏览器里给你看。**
 
 理论篇已经把 Agent 的零件拆开了。现在把它们装起来，做一个能读项目、搜代码、改文件、跑命令的 Coding Agent，并且给它一个网页界面：模型请求了什么工具、参数是什么、返回了什么、哪一步需要你点头，全都看得见。
 
-## 先看图
+对应理论篇：第 01～03 章、[第 04 章 Hooks](../../chapters/04-hooks/) 和[第 15 章 Agent Harness](../../chapters/15-integrated-harness/)。第 04 章在首页列为可选，但本实战的扩展机制用到了它的 `Stop` 节点，后面的 Lab 05、07、08 也都靠它；没读过的话，先看那一章。
 
-![Mini Coding Agent 的工作结构](../../assets/lab-01-mini-coding-agent.png)
+## 先看图
 
 看图时抓住三件事：
 
@@ -31,17 +33,28 @@
 
 ### bash 什么时候自动执行
 
-规则只有一句话：
+同时满足下面三条才自动执行，其余一律弹窗授权：
 
-> **单条命令 + 不含 shell 操作符（`|` `>` `<` `;` `&` 反引号 `$(`）+ 首词在只读白名单里 → 自动执行；其余一律弹窗授权。**
+1. **没有 shell 操作符**：`|` `>` `<` `;` `&` 反引号 `$` `{` 都不能出现。
+2. **命令在只读白名单里**：`ls / pwd / cat / head / tail / wc / file / tree / grep / rg`，外加 `git status`、`git diff`、`git log`、`git branch` 这几个两词前缀。
+3. **参数也是只读的**：不能指向工作区外面（绝对路径、`~`、`..`），也不能带“会写文件或运行程序”的选项。
 
-白名单是 `ls / pwd / cat / head / tail / wc / file / tree / grep / rg`，外加 `git status`、`git diff`、`git log`、`git branch` 这几个两词前缀。
+所以 `ls -la`、`git status`、`grep -rn foo labs` 直接跑；`git commit`、`rm x`、`cat a > b`、`python3 script.py` 都会停下来问你。
 
-所以 `ls -la` 直接跑，`git status` 直接跑，而 `git commit`、`rm x`、`cat a > b`、`python3 script.py` 都会停下来问你。规则简单的好处是：你一眼能看完，也就不容易被花式写法绕过去。
+第 3 条是踩过坑才加的。只看首词的话，下面这些命令都会被当成“只读”直接执行：
+
+| 命令 | 首词看起来只读，实际会 |
+|---|---|
+| `cat ~/.zsh_history` | 读工作区外面的文件 |
+| `git branch -D main` | 删分支 |
+| `git diff --output=x`、`tree -o x` | 写文件 |
+| `rg --pre <程序>` | 运行任意程序 |
+
+**一条命令是不是只读，要看它的参数，不能只看名字。** `git branch` 因为几乎带什么参数都会改分支，所以只放行纯查看的几种写法。
 
 另外，命令里出现 `.env`、`.git/`、`.ssh`、`/etc/`、`sudo` 会被直接拦掉，连授权框都不弹。
 
-这不是完整沙箱。`bash` 仍然以你的用户权限运行，只在你信任的工作区里玩。
+这仍然不是沙箱。检查的是命令文本，挡的是常见写法：工作区里指向外面的符号链接、白名单命令以后新增的选项，它都看不出来。`bash` 以你的用户权限运行，只在你信任的工作区里用；真正的隔离要靠容器或系统级沙箱。
 
 ## 跑起来
 
@@ -179,7 +192,7 @@ Agent 跑在后台线程。它调 `confirm(...)` 时，`PermissionGate` 做三�
 
 ## 怎么加能力：Extension
 
-后面几个实战都不改这个文件的循环，而是写一个 `Extension` 子类挂上来。它只有三个挂载点：
+后面几个实战都不改这个文件的循环，而是写一个 `Extension` 子类挂上来。它只有三个挂载点，其中只有 `on_stop` 是第 04 章说的 Hook（系统到点自动执行）：
 
 ```python
 class Extension:
@@ -224,7 +237,7 @@ uv run python labs/01-mini-coding-agent/server.py --lab 05 --ext subagent
 | Agent Loop | `CodingAgent.run()` |
 | Tool Use | `Tool` 基类和它的四个子类 |
 | Permission | `Workspace.resolve()`、`Tool.confirm_prompt()`、`PermissionGate` |
-| Hooks | `Extension` 的三个挂载点。`on_stop` 就是第 04 章的 `Stop` 节点 |
+| Hooks | `Extension.on_stop`，也就是第 04 章的 `Stop` 节点。`tools` 和 `system_prompt` 是另外两种扩展方式，不是 Hook：前者给模型多几个可选的工具，后者改的是上下文 |
 | Harness | `CodingAgent + Workspace + AgentSession` |
 
 上下文只是 `CodingAgent.messages` 这个列表；Lab 01 基线不做压缩。Lab 07 展示如何在任务结束后整理旧历史，不修改这个循环。
@@ -233,7 +246,7 @@ uv run python labs/01-mini-coding-agent/server.py --lab 05 --ext subagent
 
 ## 上下文只在内存里
 
-这个例子没有把会话存到磁盘。点「清空上下文」或者重启服务，对话就没了，但工作区里已经改过的文件不会回滚——这两件事是分开的。
+这个例子没有把会话存到磁盘。点「新对话」或者重启服务，对话就没了，但工作区里已经改过的文件不会回滚——这两件事是分开的。
 
 如果你想加持久化，可以在 `CodingAgent` 里把每条 message 追加写进一个 JSONL 文件，启动时再读回来。这是个不错的练手题。
 
