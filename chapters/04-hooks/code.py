@@ -65,7 +65,6 @@ TOOLS = [
 
 # Hard boundaries live inside the tool functions: every call passes through them,
 # whether or not any hook is registered. They are the same limits as chapter 03.
-SENSITIVE_FILES = {".env", ".env.local", ".env.production", ".env.development"}
 ROOT_READABLE_FILES = {"README.md", "Agents.md", "SOURCES.md", "STYLE_GUIDE.md"}
 
 
@@ -80,7 +79,7 @@ def safe_path(relative_path: str) -> Path:
 
 def safe_read_path(relative_path: str) -> Path:
     path = safe_path(relative_path)
-    if path.name in SENSITIVE_FILES or any(part.startswith(".git") for part in path.parts):
+    if any(part.startswith((".env", ".git")) for part in path.parts):
         raise ValueError("出于安全考虑，不能读取 .env 或 .git 等敏感路径")
     is_root_doc = path.parent == WORKDIR and path.name in ROOT_READABLE_FILES
     if not (is_root_doc or (WORKDIR / "chapters") in path.parents):

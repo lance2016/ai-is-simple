@@ -75,14 +75,13 @@ def safe_path(relative_path: str) -> Path:
     return path
 
 
-SENSITIVE_FILES = {".env", ".env.local", ".env.production", ".env.development"}
 ROOT_READABLE_FILES = {"README.md", "Agents.md", "SOURCES.md", "STYLE_GUIDE.md"}
 
 
 def safe_read_path(relative_path: str) -> Path:
     """把读取范围限制在教学文档和章节目录，并拒绝敏感文件。"""
     path = safe_path(relative_path)
-    if path.name in SENSITIVE_FILES or any(part.startswith(".git") for part in path.parts):
+    if any(part.startswith((".env", ".git")) for part in path.parts):
         raise ValueError("出于安全考虑，不能读取 .env 或 .git 等敏感路径")
 
     is_root_doc = path.parent == WORKDIR and path.name in ROOT_READABLE_FILES
@@ -216,11 +215,18 @@ def agent_loop(user_text: str) -> str:
             tools=TOOLS,
             tool_choice="auto",
         )
-        message = response.choices[0].message
+        choice = response.choices[0]
+        message = choice.message
         messages.append(message.model_dump(exclude_none=True))
 
         if not message.tool_calls:
+            if choice.finish_reason != "stop":
+                return f"模型未正常结束：{choice.finish_reason}"
             return message.content or ""
+
+        # Same rule as chapter 01: never run arguments that may have been cut off.
+        if choice.finish_reason != "tool_calls":
+            return f"工具调用未正常结束：{choice.finish_reason}"
 
         for tool_call in message.tool_calls:
             result = run_tool(tool_call)
@@ -236,5 +242,12 @@ def agent_loop(user_text: str) -> str:
 
 
 if __name__ == "__main__":
-    query = input("请输入任务（例如：请读取 README.md）：\n> ")
-    print(agent_loop(query))
+    # Keep reading so several requests can be tried in one run; each one is a fresh task.
+    while True:
+        try:
+            query = input("请输入任务（例如：请读取 README.md；直接回车退出）：\n> ").strip()
+        except (EOFError, KeyboardInterrupt):
+            break
+        if not query:
+            break
+        print(agent_loop(query))

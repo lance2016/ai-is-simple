@@ -338,5 +338,12 @@ def agent_loop(user_text: str) -> str:
 
 
 if __name__ == "__main__":
-    query = input("请输入一个任务管理请求：\n> ")
-    print(agent_loop(query))
+    # Keep reading so several requests can be tried in one run; each one is a fresh task.
+    while True:
+        try:
+            query = input("请输入一个任务管理请求（直接回车退出）：\n> ").strip()
+        except (EOFError, KeyboardInterrupt):
+            break
+        if not query:
+            break
+        print(agent_loop(query))

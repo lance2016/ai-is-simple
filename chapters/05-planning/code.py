@@ -232,11 +232,18 @@ def agent_loop(user_text: str) -> str:
             tools=TOOLS,
             tool_choice="auto",
         )
-        message = response.choices[0].message
+        choice = response.choices[0]
+        message = choice.message
         messages.append(message.model_dump(exclude_none=True))
 
         if not message.tool_calls:
+            if choice.finish_reason != "stop":
+                return f"模型未正常结束：{choice.finish_reason}"
             return message.content or ""
+
+        # Same rule as chapter 01: never run arguments that may have been cut off.
+        if choice.finish_reason != "tool_calls":
+            return f"工具调用未正常结束：{choice.finish_reason}"
 
         used_todo = False
         for tool_call in message.tool_calls:
