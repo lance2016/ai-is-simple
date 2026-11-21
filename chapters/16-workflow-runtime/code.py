@@ -8,6 +8,7 @@ import os
 import re
 import secrets
 import threading
+from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
@@ -28,6 +29,17 @@ STORE = Path(os.getenv("WORKFLOW_STORE", WORKDIR / ".workflow-runtime"))
 MAX_TURNS = 8
 WORKFLOW_NAME_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$")
 RUN_ID_RE = re.compile(r"^wf_[A-Za-z0-9][A-Za-z0-9._-]{0,63}_[0-9a-f]{8}$")
+# The workflow author fixes what gets read; the model never picks a path.
+LISTED_DIRS = ("", "chapters", "chapters/01-agent-loop", "labs", "assets")
+EXCERPT_FILES = (
+    "README.md",
+    "chapters/01-agent-loop/README.md",
+    "chapters/15-integrated-harness/README.md",
+)
+SKIP_NAMES = {".venv", "node_modules", "__pycache__"}
+MAX_NAMES_PER_DIR = 40
+MAX_FILE_CHARS = 1500
+MAX_TOTAL_CHARS = 5000  # keeps the prompt bounded even if EXCERPT_FILES grows
 
 
 class WorkflowError(Exception):
@@ -136,6 +148,34 @@ def ask_agent(label: str, prompt: str) -> str:
     return content
 
 
+def gather_structure() -> str:
+    lines = []
+    for folder in LISTED_DIRS:
+        # Sorted so the same tree always yields the same prompt text.
+        names = sorted(
+            entry.name + ("/" if entry.is_dir() else "")
+            for entry in (WORKDIR / folder).iterdir()
+            if not entry.name.startswith(".") and entry.name not in SKIP_NAMES
+        )
+        more = f" 等共 {len(names)} 项" if len(names) > MAX_NAMES_PER_DIR else ""
+        lines.append(f"{folder or '项目根目录'}/：{'、'.join(names[:MAX_NAMES_PER_DIR])}{more}")
+    return "\n".join(lines)
+
+
+def gather_excerpts() -> str:
+    parts, budget = [], MAX_TOTAL_CHARS
+    for name in EXCERPT_FILES:
+        limit = min(MAX_FILE_CHARS, budget)
+        if limit <= 0:
+            break
+        with (WORKDIR / name).open(encoding="utf-8") as file:
+            head = file.read(limit + 1)  # one extra char reveals whether the file continues
+        note = "\n（以上只是开头摘录，后文未读取）" if len(head) > limit else ""
+        parts.append(f"### {name}\n{head[:limit]}{note}")
+        budget -= limit
+    return "\n\n".join(parts)
+
+
 class WorkflowContext:
     def __init__(self, journal: Journal):
         self.journal = journal
@@ -146,14 +186,18 @@ class WorkflowContext:
     def log(self, message: str) -> None:
         print(f"[workflow] {message}")
 
-    def agent(self, step: str, prompt: str) -> str:
+    def step(self, step: str, run: Callable[[], str]) -> str:
+        """Code-only steps are journaled too, so a resume reuses the material cached answers were based on."""
         cached = self.journal.cached(step)
         if cached is not None:
             self.log(f"跳过已完成步骤：{step}")
             return cached
-        result = ask_agent(step, prompt)
+        result = run()
         self.journal.complete_step(step, result)
         return result
+
+    def agent(self, step: str, prompt: str) -> str:
+        return self.step(step, lambda: ask_agent(step, prompt))
 
     def parallel(self, jobs: list[tuple[str, str]]) -> dict[str, str]:
         """并行屏障：所有独立步骤完成后，才把结果交给下一阶段。"""
@@ -172,16 +216,22 @@ class WorkflowContext:
 
 def review_project(ctx: WorkflowContext, args: dict) -> dict:
     subject = args.get("subject", "理解这个项目的 Agent 运行方式")
+    ctx.phase("收集材料")
+    structure = ctx.step("gather_structure", gather_structure)
+    excerpts = ctx.step("gather_excerpts", gather_excerpts)
+    grounding = "只依据下面的材料回答；材料里没有的内容，直接说“材料中没有”。"
     ctx.phase("并行检查")
     findings = ctx.parallel(
         [
             (
                 "check_concept",
-                f"围绕“{subject}”，用初学者能懂的话说明 Agent Loop 和 Harness 的关系。",
+                f"围绕“{subject}”，用初学者能懂的话说明 Agent Loop 和 Harness 的关系。{grounding}\n\n"
+                f"<材料>\n{excerpts}\n</材料>",
             ),
             (
                 "check_structure",
-                "根据项目结构，说明 README、章节代码和 assets 分别承担什么作用。",
+                f"说明 README、章节代码和 assets 分别承担什么作用。{grounding}\n\n"
+                f"<材料>\n{structure}\n\n{excerpts}\n</材料>",
             ),
         ]
     )
@@ -196,9 +246,9 @@ def review_project(ctx: WorkflowContext, args: dict) -> dict:
 
 WORKFLOWS = {
     "review_project": {
-        "version": 1,
-        "description": "并行检查项目概念和结构，再汇总成学习笔记。",
-        "phases": ["并行检查", "汇总结果"],
+        "version": 2,
+        "description": "代码先读项目目录和 README 开头，再并行检查概念和结构，最后汇总成学习笔记。",
+        "phases": ["收集材料", "并行检查", "汇总结果"],
         "runner": review_project,
     }
 }
