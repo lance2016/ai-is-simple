@@ -19,6 +19,18 @@
 
 **Context Management** 像这次工作台上的资料：每轮请求具体带哪些历史、哪些旧信息可以压缩。Lab 02 讲持久记忆；本实战只整理当前 Coding Agent 的对话历史。
 
+## 和第 08 章有什么不同
+
+对应理论篇：[第 08 章 Context Compact](../../chapters/08-context-compact/)。两边都在整理上下文，但时机和对象不一样：
+
+| | 第 08 章 | 本实战 |
+| --- | --- | --- |
+| 什么时候整理 | 每次请求模型之前 | 一项任务结束时（`on_stop`） |
+| 解决什么 | 单个任务做到一半，上下文就超限 | 任务一个接一个，旧任务的历史越积越多 |
+| 怎么整理 | 先外置大结果、再裁剪旧消息，最后才摘要 | 把已完成的任务压成一段摘要 |
+
+差别来自一个设计取舍：后续实战都不改 Lab 01 的循环，而 `Extension` 没有“请求模型之前”这个挂载点。所以单个任务中途超限，这个扩展管不了。想处理它，得像第 08 章那样在每次请求前整理，也就是给循环加一个新的挂载点；这是个不错的练手题。
+
 ## 启动 Agent
 
 这个实战使用项目已有的 Python + DeepSeek 环境，不需要启动额外容器。在项目根目录运行：
@@ -40,7 +52,7 @@ uv run --group observability python labs/01-mini-coding-agent/server.py --lab 07
 
 ## 扩展是怎样整理上下文的
 
-本项目目前提供的生命周期挂载点是 tools、system_prompt 和 on_stop。Lab 07 用 on_stop 在一项任务完成后检查较早的消息；超过教学用字符预算时，才调用同一个 DeepSeek 模型生成摘要。
+Lab 01 的 `Extension` 只有三个挂载点：tools、system_prompt 和 on_stop，其中 on_stop 是唯一的生命周期节点。Lab 07 用它在一项任务完成后检查较早的消息；超过教学用字符预算时，才调用同一个 DeepSeek 模型生成摘要。
 
 ~~~python
 response = agent.client.chat.completions.create(

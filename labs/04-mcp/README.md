@@ -4,7 +4,7 @@
 
 **本实战新增：** 一个手写的 MCP Server（约 120 行）和一个把远程工具注册进工具池的扩展（约 140 行），都含注释。不依赖任何 MCP SDK。
 
-对应理论篇：[第 14 章 MCP Plugin](../../chapters/14-mcp-plugin/)、[第 03 章 Permission](../../chapters/03-permission/)。
+对应理论篇：[第 14 章 MCP](../../chapters/14-mcp-plugin/)、[第 03 章 Permission](../../chapters/03-permission/)。
 
 ## 先看结构
 

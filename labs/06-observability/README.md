@@ -4,7 +4,7 @@
 
 > **一句话总结：本实战把一次用户提问记为一条 Trace，把模型请求和工具执行记为其中的 Span；沿着 Span 树看，就能找到 Agent 做过什么、哪里变慢或失败。**
 
-**本实战新增：** 给 Lab 01 接入 Phoenix（收集和查看 Agent 运行记录的工具）。OpenAI SDK（Python 客户端）自动记录模型请求；Harness（负责检查权限并运行工具的程序）补上任务和工具记录。Agent Loop 不变。
+**本实战新增：** 给 Lab 01 接入 Phoenix（收集和查看 Agent 运行记录的工具）。OpenAI SDK（Python 客户端）自动记录模型请求；Harness（包在模型外面的那层程序，负责准备上下文和工具、检查并执行工具调用）补上任务和工具记录。Agent Loop 不变。
 
 ## 先看图
 
@@ -73,7 +73,7 @@ Span 状态有 `Unset`（未设置）、`OK`（成功）和 `Error`（出错）�
 
 一段对话可以持续很久，但一次用户提问到 Agent 回答有明确的开始和结束。因此，本实战为每次提问创建一条 Trace，再用同一个 Session ID 关联这些 Trace。这样可以单独查看某一轮，也能回顾整段对话。
 
-网页后端在对话开始时生成会话编号；点“重置”后会生成新的编号：
+网页后端在对话开始时生成会话编号；点“新对话”后会生成新的编号：
 
 ~~~python
 with self.observer.agent_run(prompt, session_id=self.conversation_id):
@@ -82,7 +82,7 @@ with self.observer.agent_run(prompt, session_id=self.conversation_id):
 
 `agent_run()` 会把同一个 `session.id` 写入根 Span，并传给里面自动记录的模型 Span。
 
-下面的列表里，每行是一段对话。重置前后的问题属于两个 Session：
+下面的列表里，每行是一段对话。点“新对话”前后的问题属于两个 Session：
 
 ![Phoenix Sessions 列表，带编号标注](./screenshots/phoenix-sessions-annotated.jpg)
 
@@ -90,7 +90,7 @@ with self.observer.agent_run(prompt, session_id=self.conversation_id):
 
 ![Phoenix Session 详情，带编号标注](./screenshots/phoenix-session-detail-annotated.jpg)
 
-同一 Session 后续的模型请求会带上前面的对话，所以输入 token 往往会增加。重置后上下文清空，新问题会进入新的 Session。
+同一 Session 后续的模型请求会带上前面的对话，所以输入 token 往往会增加。点“新对话”后上下文清空，新问题会进入新的 Session。
 
 ## 模型请求怎么自动记录，工具怎么补上
 
@@ -133,7 +133,7 @@ uv run --group observability python labs/01-mini-coding-agent/server.py --lab 06
 2. **定位并修复**：观察 `edit`、验证命令和授权等待分别记录在哪个 Span。
 3. **故意失败**：找到标红的 `agent.tool`，查看错误输出；根 Span 仍可能是 `Unset`。
 
-不点“重置”，连续追问几次，再去 Sessions 查看它们如何归在一起。完成后可用下面的命令停止 Phoenix；轨迹会保留在 Docker 数据卷中：
+不点“新对话”，连续追问几次，再去 Sessions 查看它们如何归在一起。完成后可用下面的命令停止 Phoenix；轨迹会保留在 Docker 数据卷中：
 
 ~~~bash
 docker compose -f labs/06-observability/compose.yaml down
