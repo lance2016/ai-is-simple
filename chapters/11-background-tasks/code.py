@@ -5,6 +5,8 @@ from __future__ import annotations
 
 import json
 import os
+import subprocess
+import sys
 import threading
 import time
 import uuid
@@ -26,112 +28,140 @@ WORKDIR = Path(__file__).resolve().parents[2]
 MAX_TURNS = 8
 
 
+# The model picks a job NAME; the argv is fixed here and never comes from the model.
+CHECK_SYNTAX_SCRIPT = """
+import ast, pathlib, sys
+files = sorted(p for d in ("chapters", "labs") for p in pathlib.Path(d).rglob("*.py"))
+bad = 0
+for path in files:
+    try:
+        ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
+    except SyntaxError as exc:
+        bad += 1
+        print(f"{path}:{exc.lineno}: {exc.msg}")
+print(f"已检查 {len(files)} 个文件，{bad} 个有语法错误")
+sys.exit(1 if bad else 0)
+"""
+JOBS = {
+    "check_syntax": {
+        "description": "解析 chapters/ 和 labs/ 下所有 .py 文件，检查语法",
+        "argv": [sys.executable, "-B", "-c", CHECK_SYNTAX_SCRIPT],
+    },
+    "run_demo_tests": {
+        "description": "运行 labs/05-verify/demo 的单元测试（这个练习目录故意留了 bug）",
+        "argv": [sys.executable, "-B", "-m", "unittest", "discover", "-s", "labs/05-verify/demo"],
+    },
+}
+JOB_TIMEOUT = 30
+OUTPUT_TAIL_CHARS = 2000
+SECRET_ENV_MARKERS = ("KEY", "TOKEN", "SECRET", "PASSWORD")
+
+
+def child_env() -> dict[str, str]:
+    # load_dotenv() put the API key into os.environ; a test run needs no credentials.
+    env = {
+        name: value
+        for name, value in os.environ.items()
+        if not any(marker in name.upper() for marker in SECRET_ENV_MARKERS)
+    }
+    # No .pyc files in the project; UTF-8 so the Chinese output decodes cleanly.
+    env.update(PYTHONDONTWRITEBYTECODE="1", PYTHONIOENCODING="utf-8")
+    return env
+
+
 class BackgroundManager:
-    """用线程模拟慢任务；状态和待收集通知都只保存在当前进程中。"""
+    """每个后台任务一个线程；状态和待收集通知都只保存在当前进程中。"""
 
     def __init__(self):
         self.jobs: dict[str, dict] = {}
         self.ready: list[str] = []
         self.lock = threading.Lock()
 
-    def start(self, label: str, seconds: int = 2) -> str:
-        if not isinstance(label, str) or not label.strip():
-            raise ValueError("任务名称不能为空")
-        if len(label) > 120:
-            raise ValueError("任务名称不能超过 120 个字符")
+    def start(self, job: str, delay_seconds: int = 3) -> str:
+        if not isinstance(job, str) or job not in JOBS:
+            raise ValueError(f"未知任务，只能从这些名字里选：{'、'.join(JOBS)}")
         if (
-            isinstance(seconds, bool)
-            or not isinstance(seconds, int)
-            or not 1 <= seconds <= 10
+            isinstance(delay_seconds, bool)
+            or not isinstance(delay_seconds, int)
+            or not 0 <= delay_seconds <= 10
         ):
-            raise ValueError("示例只允许等待 1～10 秒")
+            raise ValueError("delay_seconds 必须是 0 到 10 之间的整数")
 
         job_id = f"bg_{uuid.uuid4().hex[:8]}"
         with self.lock:
             self.jobs[job_id] = {
                 "id": job_id,
-                "label": label,
+                "job": job,
                 "status": "running",
-                "result": "",
+                "exit_code": None,
+                "output": "",
             }
 
-        worker = threading.Thread(
-            target=self._run,
-            args=(job_id, label, seconds),
-            daemon=True,
-        )
-        try:
-            worker.start()
-        except Exception as exc:
-            with self.lock:
-                job = self.jobs[job_id]
-                job["status"] = "failed"
-                job["error"] = type(exc).__name__
-                self.ready.append(job_id)
-            return f"后台任务启动失败：{job_id}（{type(exc).__name__}）"
-        return f"后台任务已启动：{job_id}（{label}）"
+        worker = threading.Thread(target=self._run, args=(job_id, job, delay_seconds), daemon=True)
+        worker.start()
+        return f"后台任务已启动：{job_id}（{job}），status=running"
 
-    def _run(self, job_id: str, label: str, seconds: int) -> None:
+    def _run(self, job_id: str, job: str, delay_seconds: int) -> None:
+        # Teaching delay only: the real jobs finish too fast to be seen running.
+        time.sleep(delay_seconds)
         try:
-            time.sleep(seconds)
-            result = f"{label} 已完成，耗时约 {seconds} 秒。"
-            status = "completed"
-            error = ""
+            proc = subprocess.run(
+                JOBS[job]["argv"],
+                shell=False,
+                cwd=WORKDIR,
+                env=child_env(),
+                capture_output=True,
+                encoding="utf-8",
+                errors="replace",
+                timeout=JOB_TIMEOUT,
+            )
+        except subprocess.TimeoutExpired:
+            self._finish(job_id, "failed", None, f"超过 {JOB_TIMEOUT} 秒，子进程已被终止")
         except Exception as exc:
-            result = ""
-            status = "failed"
-            # 示例只把错误类型交给模型，避免把线程内部细节原样暴露出去。
-            error = type(exc).__name__
+            self._finish(job_id, "failed", None, f"子进程没有跑起来（{type(exc).__name__}）")
+        else:
+            status = "succeeded" if proc.returncode == 0 else "failed"
+            self._finish(job_id, status, proc.returncode, proc.stdout + proc.stderr)
 
+    def _finish(self, job_id: str, status: str, exit_code: int | None, output: str) -> None:
+        """Record a terminal state; a failed job is kept, never silently dropped."""
         with self.lock:
-            job = self.jobs.get(job_id)
-            if job is None:
-                return
-            job["status"] = status
-            job["result"] = result
-            job["error"] = error
+            record = self.jobs[job_id]
+            record["status"] = status
+            record["exit_code"] = exit_code
+            # Tracebacks carry absolute paths; the model does not need the home directory.
+            output = output.replace(str(WORKDIR), ".").strip()
+            # Summaries and failures sit at the end of test output, so keep the tail.
+            record["output"] = output[-OUTPUT_TAIL_CHARS:]
             self.ready.append(job_id)
 
     def collect(self) -> str:
         with self.lock:
-            ready_ids = list(self.ready)
+            finished = [dict(self.jobs[job_id]) for job_id in self.ready]
             self.ready.clear()
-            completed = [dict(self.jobs[job_id]) for job_id in ready_ids]
-            running = [
-                dict(job)
-                for job in self.jobs.values()
-                if job["status"] == "running"
-            ]
+            running = [dict(r) for r in self.jobs.values() if r["status"] == "running"]
 
         lines = []
-        for job in completed:
-            if job["status"] == "completed":
-                lines.append(
-                    f"[task_notification] {job['id']} status=completed: "
-                    f"{job['result']}"
-                )
-            else:
-                lines.append(
-                    f"[task_notification] {job['id']} status=failed "
-                    f"error={job['error']}"
-                )
-        if running:
+        for record in finished:
             lines.append(
-                "仍在运行："
-                + "、".join(f"{job['id']}（{job['label']}）" for job in running)
+                f"[task_notification] {record['id']} job={record['job']} "
+                f"status={record['status']} exit_code={record['exit_code']}\n"
+                f"输出末尾：\n{record['output'] or '(没有输出)'}"
             )
+        for record in running:
+            lines.append(f"[仍在运行] {record['id']} job={record['job']} status=running")
         return "\n".join(lines) or "(没有新的后台结果)"
 
 
 BACKGROUND = BackgroundManager()
 
 
-def start_background_job(label: str, seconds: int = 2) -> str:
-    return BACKGROUND.start(label, seconds)
+def start_background_job(job: str, delay_seconds: int = 3) -> str:
+    return BACKGROUND.start(job, delay_seconds)
 
 
 def collect_background_jobs() -> str:
-    """取出新完成任务的一次性通知，并附上仍在运行的任务。"""
+    """取出新结束任务的一次性通知，并附上仍在运行的任务。"""
     return BACKGROUND.collect()
 
 
@@ -198,23 +228,23 @@ TOOLS = [
         "type": "function",
         "function": {
             "name": "start_background_job",
-            "description": "启动一个模拟慢任务，明确放到后台执行，不阻塞当前 Agent Loop。",
+            "description": (
+                "在后台运行一个预设任务，立刻返回任务 ID，不阻塞当前 Agent Loop。"
+                "只能选任务名，不能传命令。可选任务："
+                + "；".join(f"{name}＝{job['description']}" for name, job in JOBS.items())
+            ),
             "parameters": {
                 "type": "object",
                 "properties": {
-                    "label": {
-                        "type": "string",
-                        "description": "任务名称",
-                        "maxLength": 120,
-                    },
-                    "seconds": {
+                    "job": {"type": "string", "enum": list(JOBS)},
+                    "delay_seconds": {
                         "type": "integer",
-                        "description": "模拟耗时，1 到 10 秒",
-                        "minimum": 1,
+                        "description": "教学用延迟：开跑前先等几秒，方便观察 running 状态",
+                        "minimum": 0,
                         "maximum": 10,
                     },
                 },
-                "required": ["label"],
+                "required": ["job"],
             },
         },
     },
@@ -222,7 +252,7 @@ TOOLS = [
         "type": "function",
         "function": {
             "name": "collect_background_jobs",
-            "description": "收集新完成任务的一次性通知，并查看仍在运行的任务。",
+            "description": "收集新结束任务的一次性通知（成功或失败），并查看仍在运行的任务。",
             "parameters": {"type": "object", "properties": {}},
         },
     },
@@ -271,8 +301,9 @@ def agent_loop(user_text: str) -> str:
                 "你是一个简洁的中文助手。只有用户明确要求后台执行，"
                 "或任务明显耗时且还有独立工作可做时，才使用 start_background_job。"
                 "后台启动后可以继续处理独立的读取任务，之后用 "
-                "collect_background_jobs 查询结果。查询若返回 running，"
-                "不能说任务已完成；不要连续空转查询。"
+                "collect_background_jobs 查询结果。结果里是 status=running 时，"
+                "不能说任务已结束，也不要连续空转查询，告诉用户稍后再问即可。"
+                "status=failed 时如实报告退出码和关键输出，不要说成成功。"
             ),
         },
         {"role": "user", "content": user_text},
@@ -298,6 +329,9 @@ def agent_loop(user_text: str) -> str:
 
         for tool_call in message.tool_calls:
             result = run_tool_call(tool_call)
+            # Show the first line so the learner can watch running / failed go by.
+            first_line = result.partition("\n")[0][:100]
+            print(f"  [tool] {tool_call.function.name}: {first_line}")
             messages.append(
                 {
                     "role": "tool",
@@ -331,5 +365,14 @@ def run_tool_call(tool_call) -> str:
 
 
 if __name__ == "__main__":
-    query = input("请输入任务（例如：后台运行一个 3 秒任务，同时读取 README.md）：\n> ")
-    print(agent_loop(query))
+    print("输入任务，空行或 exit 退出。例如：后台跑 run_demo_tests，然后告诉我任务 ID。")
+    # Keep the process alive between inputs: BACKGROUND (and its worker threads)
+    # must outlive a single agent_loop call, or the result is never collected.
+    try:
+        while True:
+            query = input("> ").strip()
+            if not query or query.lower() in {"exit", "quit"}:
+                break
+            print(agent_loop(query))
+    except (EOFError, KeyboardInterrupt):
+        print()
