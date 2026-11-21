@@ -21,10 +21,12 @@ client = OpenAI(api_key=API_KEY, base_url=BASE_URL)
 WORKDIR = Path(__file__).resolve().parents[2]
 OUTPUT_DIR = WORKDIR / ".task_outputs" / "tool-results"
 TRANSCRIPT_DIR = WORKDIR / ".transcripts"
-CONTEXT_CHAR_LIMIT = 12000
-LARGE_RESULT_CHAR_LIMIT = 1200
-SUMMARY_HISTORY_CHAR_LIMIT = 10000
-MAX_TURNS = 8
+# Teaching thresholds: deliberately tiny so one short run can show all three steps.
+LARGE_RESULT_CHAR_LIMIT = 4000  # step 1: per tool result
+KEEP_RECENT_MESSAGES = 3  # step 2: by message count
+CONTEXT_CHAR_LIMIT = 10000  # step 3: estimated size of the whole request
+SUMMARY_HISTORY_CHAR_LIMIT = 8000
+MAX_TURNS = 12
 INTERNAL_STORAGE_DIRS = {".task_outputs", ".transcripts"}
 
 
@@ -73,53 +75,94 @@ def list_files(pattern: str) -> str:
     return "\n".join(matches[:100]) or "(没有找到文件)"
 
 
-def read_file(path: str, limit: int = 180) -> str:
-    if (
-        not isinstance(limit, int)
-        or isinstance(limit, bool)
-        or not 1 <= limit <= 200
-    ):
+def _is_positive_int(value: object) -> bool:
+    return isinstance(value, int) and not isinstance(value, bool) and value >= 1
+
+
+def read_file(path: str, offset: int = 1, limit: int = 180) -> str:
+    if not _is_positive_int(offset):
+        raise ValueError("offset 必须是从 1 开始的行号")
+    if not _is_positive_int(limit) or limit > 200:
         raise ValueError("limit 必须是 1 到 200 之间的整数")
     lines = safe_path(path).read_text(encoding="utf-8").splitlines()
-    if len(lines) > limit:
-        lines = lines[:limit] + [f"...（还有 {len(lines) - limit} 行）"]
-    return "\n".join(lines)
+    if offset > len(lines):
+        return f"(文件共 {len(lines)} 行，第 {offset} 行之后没有内容)"
+    page = lines[offset - 1 : offset - 1 + limit]
+    remaining = len(lines) - (offset - 1) - len(page)
+    if remaining > 0:
+        page.append(f"...（还有 {remaining} 行，下一页从 offset={offset + limit} 开始）")
+    return "\n".join(page)
 
 
 def estimate_chars(messages: list[dict]) -> int:
     return len(json.dumps(messages, ensure_ascii=False, default=str))
 
 
-def persist_large_results(messages: list[dict]) -> list[dict]:
-    """保存大工具结果，返回只带预览的消息列表。"""
-    changed = []
+def fresh_start(messages: list[dict]) -> int:
+    """Index of the newest assistant message; tool results after it are still unread."""
+    for index in range(len(messages) - 1, -1, -1):
+        if messages[index].get("role") == "assistant":
+            return index
+    return len(messages)
+
+
+def stored_sources(messages: list[dict]) -> dict[str, str]:
+    """Map tool_call_id to the path read, for re-reads of files this script saved itself."""
+    sources = {}
     for message in messages:
+        for call in message.get("tool_calls") or []:
+            try:
+                path = str(json.loads(call["function"]["arguments"])["path"])
+            except (json.JSONDecodeError, KeyError, TypeError):
+                continue
+            first_part = Path(path).parts[:1]
+            if first_part and first_part[0] in INTERNAL_STORAGE_DIRS:
+                sources[call["id"]] = path
+    return sources
+
+
+def persist_large_results(messages: list[dict]) -> list[dict]:
+    """保存模型已经读过的大工具结果，返回只带预览的消息列表。"""
+    seen_end = fresh_start(messages)
+    sources = stored_sources(messages)
+    changed = []
+    for index, message in enumerate(messages):
         item = dict(message)
         content = str(item.get("content", ""))
-        if item.get("role") == "tool" and len(content) > LARGE_RESULT_CHAR_LIMIT:
-            OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
-            # 路径名由程序生成，不依赖 API 返回的 ID 或其他外部文本。
-            path = OUTPUT_DIR / f"{uuid.uuid4().hex}.txt"
-            path.write_text(content, encoding="utf-8")
+        if (
+            index < seen_end
+            and item.get("role") == "tool"
+            and len(content) > LARGE_RESULT_CHAR_LIMIT
+        ):
+            # A re-read of a saved file is already on disk; do not save a copy of a copy.
+            saved = sources.get(item.get("tool_call_id"))
+            if saved is None:
+                OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+                # 路径名由程序生成，不依赖 API 返回的 ID 或其他外部文本。
+                path = OUTPUT_DIR / f"{uuid.uuid4().hex}.txt"
+                path.write_text(content, encoding="utf-8")
+                saved = str(path.relative_to(WORKDIR))
             item["content"] = (
-                f"[完整工具结果已保存到 {path.relative_to(WORKDIR)}]\n"
+                f"[工具结果已移出上下文，原文在 {saved}；"
+                "需要细节时用 read_file 的 offset 和 limit 分页读取]\n"
                 f"预览：{content[:300]}"
             )
+            print(f"[externalize] 已读过的结果（{len(content)} 字符）换成预览，原文在 {saved}")
         changed.append(item)
     return changed
 
 
-def write_transcript(messages: list[dict]) -> Path:
-    TRANSCRIPT_DIR.mkdir(parents=True, exist_ok=True)
-    path = TRANSCRIPT_DIR / f"transcript-{uuid.uuid4().hex[:8]}.json"
-    path.write_text(
-        json.dumps(messages, ensure_ascii=False, indent=2, default=str),
-        encoding="utf-8",
-    )
-    return path
+def append_transcript(transcript: Path, *messages: dict) -> None:
+    """Append-only log: each message is written once, exactly as first produced."""
+    transcript.parent.mkdir(parents=True, exist_ok=True)
+    with transcript.open("a", encoding="utf-8") as file:
+        for message in messages:
+            file.write(json.dumps(message, ensure_ascii=False, default=str) + "\n")
 
 
-def snip_history(messages: list[dict], keep_recent: int = 8) -> list[dict]:
+def snip_history(
+    messages: list[dict], transcript: Path, keep_recent: int = KEEP_RECENT_MESSAGES
+) -> list[dict]:
     if len(messages) <= keep_recent + 3:
         return messages
     head_end = 3
@@ -132,47 +175,26 @@ def snip_history(messages: list[dict], keep_recent: int = 8) -> list[dict]:
     if tail_start <= head_end:
         return messages
 
-    transcript = write_transcript(messages)
     marker = {
         "role": "user",
         "content": (
-            f"[已有历史保存到 {transcript.relative_to(WORKDIR)}；"
-            f"中间省略了 {tail_start - head_end} 条消息]"
+            "[部分较早的消息已移出上下文；"
+            f"完整原始记录在 {transcript.relative_to(WORKDIR)}（每行一条消息）]"
         ),
     }
+    print(f"[snip] 移出 {tail_start - head_end} 条旧消息，保留开头和最近几条")
     return [*messages[:head_end], marker, *messages[tail_start:]]
 
 
 def summary_history_excerpt(messages: list[dict]) -> str:
     """从最近消息往前取有限大小的完整 JSON 消息。"""
     selected = []
-    remaining = SUMMARY_HISTORY_CHAR_LIMIT - 2  # 为 JSON 数组的方括号留出空间。
+    remaining = SUMMARY_HISTORY_CHAR_LIMIT
     for message in reversed(messages):
-        encoded = json.dumps(message, ensure_ascii=False, default=str)
-        if len(encoded) + 2 <= remaining:
-            selected.append(message)
-            remaining -= len(encoded) + 2
-            continue
-
-        content = message.get("content")
-        if isinstance(content, str):
-            suffix = "\n[这条消息只保留末尾片段]"
-            empty_content = {**message, "content": ""}
-            content_budget = (
-                remaining
-                - len(json.dumps(empty_content, ensure_ascii=False, default=str))
-                - len(suffix)
-                - 2
-            )
-            if content_budget > 0:
-                clipped = {
-                    **message,
-                    "content": content[-content_budget:] + suffix,
-                }
-                if len(json.dumps(clipped, ensure_ascii=False, default=str)) + 2 <= remaining:
-                    selected.append(clipped)
-        break
-
+        remaining -= len(json.dumps(message, ensure_ascii=False, default=str))
+        if remaining < 0:
+            break
+        selected.append(message)
     selected.reverse()
     return json.dumps(selected, ensure_ascii=False, default=str)
 
@@ -191,7 +213,7 @@ def summarize_history(messages: list[dict], active_request: str) -> str:
                 "role": "user",
                 "content": (
                     f"当前用户请求：{active_request}\n"
-                    "请总结已经完成的工作、重要文件、决定和下一步。\n"
+                    "请用不超过 300 字总结已经完成的工作、重要文件、决定和下一步。\n"
                     f"历史片段：\n{history_excerpt}"
                 ),
             },
@@ -200,9 +222,12 @@ def summarize_history(messages: list[dict], active_request: str) -> str:
     return response.choices[0].message.content or "(没有生成摘要)"
 
 
-def compact_history(messages: list[dict], active_request: str) -> list[dict]:
-    transcript = write_transcript(messages)
-    summary = summarize_history(messages, active_request)
+def compact_history(
+    messages: list[dict], active_request: str, transcript: Path
+) -> list[dict]:
+    # Only history the model has already read is summarized; the newest round stays as is.
+    split = fresh_start(messages)
+    summary = summarize_history(messages[:split], active_request)
     system_message = next(
         (message for message in messages if message.get("role") == "system"),
         {"role": "system", "content": "你是一个简洁的中文助手。"},
@@ -215,18 +240,23 @@ def compact_history(messages: list[dict], active_request: str) -> list[dict]:
                 "[Compacted]\n"
                 f"当前用户请求：{active_request}\n"
                 f"对话摘要：{summary}\n"
-                f"完整 transcript：{transcript.relative_to(WORKDIR)}"
+                f"完整原始记录：{transcript.relative_to(WORKDIR)}"
             ),
         },
+        *messages[split:],
     ]
 
 
-def prepare_context(messages: list[dict], active_request: str) -> list[dict]:
+def prepare_context(
+    messages: list[dict], active_request: str, transcript: Path
+) -> list[dict]:
     messages = persist_large_results(messages)
-    messages = snip_history(messages)
-    if estimate_chars(messages) > CONTEXT_CHAR_LIMIT:
-        print("[compact] 上下文仍然较长，正在生成摘要……")
-        messages = compact_history(messages, active_request)
+    messages = snip_history(messages, transcript)
+    size = estimate_chars(messages)
+    # With only system + request before the newest round, a summary frees nothing.
+    if size > CONTEXT_CHAR_LIMIT and fresh_start(messages) > 2:
+        print(f"[compact] 估算 {size} 字符，仍超过 {CONTEXT_CHAR_LIMIT}，正在生成摘要……")
+        messages = compact_history(messages, active_request, transcript)
     return messages
 
 
@@ -247,11 +277,16 @@ TOOLS = [
         "type": "function",
         "function": {
             "name": "read_file",
-            "description": "读取项目内的文本文件。",
+            "description": "读取项目内的文本文件；长文件用 offset 和 limit 分页。",
             "parameters": {
                 "type": "object",
                 "properties": {
                     "path": {"type": "string"},
+                    "offset": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "description": "起始行号，从 1 开始",
+                    },
                     "limit": {"type": "integer", "minimum": 1, "maximum": 200},
                 },
                 "required": ["path"],
@@ -283,34 +318,50 @@ def agent_loop(user_text: str) -> str:
     messages = [
         {
             "role": "system",
-            "content": "你是一个简洁的中文助手，可以读取项目文件并总结。",
+            "content": (
+                "你是一个简洁的中文助手，可以读取项目文件并总结。"
+                "一次只读一个文件，读完先用一两句话记下要点，再读下一个。"
+                "较早的工具结果可能只剩预览和保存路径；"
+                "需要细节时用 read_file 的 offset 和 limit 重新读取。"
+            ),
         },
         {"role": "user", "content": user_text},
     ]
+    transcript = TRANSCRIPT_DIR / f"transcript-{uuid.uuid4().hex[:8]}.jsonl"
+    append_transcript(transcript, *messages)
 
     for _ in range(MAX_TURNS):
-        messages = prepare_context(messages, user_text)
+        messages = prepare_context(messages, user_text, transcript)
         response = client.chat.completions.create(
             model=MODEL,
             messages=messages,
             tools=TOOLS,
             tool_choice="auto",
         )
-        message = response.choices[0].message
-        messages.append(message.model_dump(exclude_none=True))
+        choice = response.choices[0]
+        message = choice.message
+        assistant_message = message.model_dump(exclude_none=True)
+        messages.append(assistant_message)
+        append_transcript(transcript, assistant_message)
 
         if not message.tool_calls:
+            # A cut-off reply (length limit, interruption) is not a real final answer.
+            if choice.finish_reason != "stop":
+                return f"模型未正常结束：{choice.finish_reason}"
             return message.content or ""
 
+        # Tool arguments may be truncated the same way, so do not execute them.
+        if choice.finish_reason != "tool_calls":
+            return f"工具调用未正常结束：{choice.finish_reason}"
+
         for tool_call in message.tool_calls:
-            result = run_tool(tool_call)
-            messages.append(
-                {
-                    "role": "tool",
-                    "tool_call_id": tool_call.id,
-                    "content": result,
-                }
-            )
+            tool_message = {
+                "role": "tool",
+                "tool_call_id": tool_call.id,
+                "content": run_tool(tool_call),
+            }
+            messages.append(tool_message)
+            append_transcript(transcript, tool_message)
 
     return "达到最大轮数，循环停止；请检查已保存的结果和当前任务。"
 
