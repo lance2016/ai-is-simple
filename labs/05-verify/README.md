@@ -1,5 +1,7 @@
 # 实战篇 05：Hooks：代码验收
 
+<!-- TODO(image): 封面图 assets/lab-05-verify.png 还没生成。提示词和放图方法见根目录的 IMAGE_PROMPTS.md。 -->
+
 > **一句话总结：模型说“改好了”不算数，程序自己跑一遍测试，没通过就把失败输出塞回循环接着修。**
 
 **本实战新增：** 用第 04 章的 `Stop` Hook（`on_stop`）在 Agent 准备结束时运行验收命令。Agent Loop 一行没改。

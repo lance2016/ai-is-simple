@@ -2,7 +2,7 @@
 
 ![Subagents：主 Agent 委派给独立上下文](../../assets/chapter-06-subagents.png)
 
-> **Subagent 让主 Agent 把一个范围明确的任务交给新上下文，再根据返回结果继续回答。**
+> **一句话总结：Subagent 让主 Agent 把一个范围明确的任务交给新上下文，再根据返回结果继续回答。**
 
 主 Agent 不必把调查过程中的每条消息都留在自己的对话里。它可以通过 `task` 工具启动一个 Subagent：子 Agent 使用自己的 `messages` 工作，结束后把最终文本作为工具结果交还主 Agent。
 

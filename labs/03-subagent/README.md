@@ -1,5 +1,7 @@
 # 实战篇 03：子 Agent 任务委派
 
+<!-- TODO(image): 封面图 assets/lab-03-subagent.png 还没生成。提示词和放图方法见根目录的 IMAGE_PROMPTS.md。 -->
+
 > **一句话总结：`task` 工具背后是另一个 `CodingAgent`，它用自己的上下文把活干完，只把一段总结交回来。**
 
 **本实战新增：** 一个 `task` 工具，大约 70 行（含注释）。子 Agent 直接复用 `CodingAgent`，没有另写一个循环。

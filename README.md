@@ -35,6 +35,7 @@
 
 ## 一张图看懂这门课
 
+<!-- TODO(image): 这张图还是旧的四阶段版本，和下面的文字不一致。重画提示词见 IMAGE_PROMPTS.md，生成后直接覆盖同名文件。 -->
 <img src="./assets/learning-roadmap.png" alt="AI Agent 学习路线" width="100%" />
 
 18 章不是一条必须走完的直线，而是**一条主干 + 一组按场景选用的能力**：
@@ -60,6 +61,7 @@
 
 - **主干**：建议按顺序读完 00～03，再读 15。有了这几章，就能看懂一个最小但完整的 Agent。
 - **可选能力**：遇到对应问题时再读，不必全部具备。一个好用的 Agent 往往只用了其中两三种。
+- **准备做实战**：再加上 04 Hooks。它在理论上是可选能力，但实战篇的扩展机制建在它上面。
 - 开头会先交代本章要解决的问题；需要依赖前文的地方会明确指出，其他章节可按需阅读。
 
 所有复杂 Agent，最后都建立在同一个最小循环上：
@@ -101,19 +103,22 @@
 
 | 问题 | 章节 | 面试中可展开的取舍 |
 | --- | --- | --- |
-| 循环里开始堆日志、策略和检查 | [04 · Hooks](./chapters/04-hooks/) | Tool 由模型选择，Hook 由系统到点执行；生命周期节点怎么解耦循环 |
-| 多步骤任务容易漏项，或需要中断后恢复 | [05 · Planning](./chapters/05-planning/)、[10 · Tasks](./chapters/10-tasks/)、[16 · Workflow](./chapters/16-workflow-runtime/)、[17 · Goal Loop](./chapters/17-goal-loop/) | 自适应计划、持久任务、固定流程和验收条件分别解决什么问题 |
-| 对话变长、需要带入过去信息 | [07 · Skills](./chapters/07-skill-loading/)、[08 · Context](./chapters/08-context-compact/)、[09 · Memory](./chapters/09-memory/) | 指令、当前对话和跨会话记忆不能混成一类 |
-| 需要委派、后台执行、定时触发或多人协作 | [06 · Subagents](./chapters/06-subagents/)、[11 · Background Tasks](./chapters/11-background-tasks/)、[12 · Cron](./chapters/12-cron-scheduler/)、[13 · Teams](./chapters/13-agent-teams/) | 延迟、协调成本、任务生命周期和重复执行风险如何权衡 |
-| 接入外部工具服务 | [14 · MCP](./chapters/14-mcp-plugin/) | 协议互通不等于服务可信或调用已获授权 |
+| 循环里的逻辑越来越多 | [04 · Hooks](./chapters/04-hooks/) | Tool 由模型选择，Hook 由系统到点执行；生命周期节点怎么解耦循环 |
+| 任务步骤多、容易走偏 | [05 · Planning](./chapters/05-planning/)、[10 · Tasks](./chapters/10-tasks/)、[17 · Goal Loop](./chapters/17-goal-loop/) | 当前对话里的清单、可保存的任务记录和验收条件分别解决什么问题 |
+| 上下文不够用 | [06 · Subagents](./chapters/06-subagents/)、[07 · Skills](./chapters/07-skill-loading/)、[08 · Context](./chapters/08-context-compact/) | 把过程放进另一个上下文、按需加载说明、压缩旧历史，各自会丢掉什么 |
+| 下次还要记得 | [09 · Memory](./chapters/09-memory/) | 当前对话和跨会话记忆不能混成一类；记忆要有来源，也会过期 |
+| 慢任务、定时任务 | [11 · Background Tasks](./chapters/11-background-tasks/)、[12 · Cron](./chapters/12-cron-scheduler/) | 结果谁来取、任务失败怎么办、会不会重复执行 |
+| 需要多个 Agent 分工 | [13 · Teams](./chapters/13-agent-teams/) | 协调成本、并发领取和结果验证 |
+| 要接外部服务 | [14 · MCP](./chapters/14-mcp-plugin/) | 协议互通不等于服务可信或调用已获授权 |
+| 流程已经固定 | [16 · Workflow](./chapters/16-workflow-runtime/) | 哪些步骤写死在代码里，哪些留给模型；恢复时怎样避免重复副作用 |
 
-这些章节是问题索引，不是进阶等级。先读核心主线；需要解释某种机制时，再回到对应章节。每章代码仍可独立运行，不需要把 18 章拼成一个程序。
+分组和上面那张文本图一致。这些章节是问题索引，不是进阶等级。先读核心主线；需要解释某种机制时，再回到对应章节。每章代码仍可独立运行，不需要把 18 章拼成一个程序。
 
 ## 面试准备路线
 
 项目面向 **Agent 应用开发 / Agent 工程** 面试：重点是应用怎样调用模型、连接工具、管理状态、限制风险并验证效果，不覆盖模型训练和算法研究。建议按下面顺序准备：
 
-1. **讲清基本架构：** 读 00～03、15，并运行 [Lab 01](./labs/01-mini-coding-agent/)。练习画出“模型请求 → 工具调用 → 程序检查并执行 → 工具结果 → 模型继续”的完整往返。
+1. **讲清基本架构：** 读 00～03、15，再读 04，然后运行 [Lab 01](./labs/01-mini-coding-agent/)。练习画出“模型请求 → 工具调用 → 程序检查并执行 → 工具结果 → 模型继续”的完整往返。
 2. **讲清安全边界：** 结合 03、14 和 Lab 01、[Lab 04](./labs/04-mcp/)，说明为什么提示词不能代替权限校验，外部工具和文件内容也不能默认可信。
 3. **讲清长任务状态：** 按实际问题选读 05～13、16、17；能说明什么时候该用普通循环、任务记录、子 Agent 或固定 Workflow，以及各自增加的延迟、成本和失败面。
 4. **讲清如何改进质量：** 运行 [Lab 05](./labs/05-verify/)、[Lab 06](./labs/06-observability/) 和 [Lab 08](./labs/08-evaluation/)，练习从失败 Trace 找原因、把失败变成回归案例，并比较改动前后的结果。
@@ -263,113 +268,37 @@ npm run docs:dev
 ```text
 ai-is-simple/
 ├── README.md
-├── Agents.md
-├── STYLE_GUIDE.md
-├── SOURCES.md
-├── ROADMAP.md
-├── assets/
-│   ├── readme-hero.png
-│   ├── learning-roadmap.png
-│   ├── chapter-00-chat-completion.png
-│   ├── chapter-01-agent-loop.png
-│   ├── chapter-02-tool-use.png
-│   ├── chapter-03-permission.png
-│   ├── chapter-04-hooks.png
-│   ├── chapter-05-planning.png
-│   ├── chapter-06-subagents.png
-│   ├── chapter-07-skill-loading.png
-│   ├── chapter-08-context-compact.png
-│   ├── chapter-09-memory.png
-│   ├── chapter-10-tasks.png
-│   ├── chapter-11-background-tasks-v2.png
-│   ├── chapter-12-cron-scheduler.png
-│   ├── chapter-13-agent-teams.png
-│   ├── chapter-14-mcp-plugin.png
-│   ├── chapter-15-integrated-harness.png
-│   ├── chapter-16-workflow-runtime.png
-│   ├── chapter-17-goal-loop.png
-│   ├── lab-01-mini-coding-agent.png
-│   ├── lab-02-long-term-memory.png
-│   ├── lab-06-observability.png
-│   ├── lab-07-context-management.png
-│   ├── lab-08-evaluation.png
-│   └── lab-09-skill-loading.png
-├── pyproject.toml
-├── uv.lock
-├── .env.example
-├── chapters/
-│   ├── 00-chat-completion/
+├── Agents.md             # 协作约定
+├── STYLE_GUIDE.md        # 配图规范
+├── SOURCES.md            # 参考来源
+├── ROADMAP.md            # 项目进度
+├── IMAGE_PROMPTS.md      # 待生成配图的提示词
+├── assets/               # 全部配图：chapter-NN-*.png、lab-NN-*.png
+├── chapters/             # 理论篇，00～17 共 18 章
+│   └── NN-topic/
+│       ├── README.md     # 讲明白
+│       └── code.py       # 跑明白；第 07 章另有 skills/
+├── labs/                 # 实战篇
+│   ├── 01-mini-coding-agent/
 │   │   ├── README.md
-│   │   └── code.py
-│   ├── 01-agent-loop/
-│   │   ├── README.md
-│   │   └── code.py
-│   ├── 02-tool-use/
-│   │   ├── README.md
-│   │   └── code.py
-│   ├── 03-permission/
-│   │   ├── README.md
-│   │   └── code.py
-│   ├── 04-hooks/
-│   │   ├── README.md
-│   │   └── code.py
-│   ├── 05-planning/
-│   │   ├── README.md
-│   │   └── code.py
-│   ├── 06-subagents/
-│   │   ├── README.md
-│   │   └── code.py
-│   ├── 07-skill-loading/
-│   │   ├── README.md
-│   │   ├── code.py
-│   │   └── skills/
-│   ├── 08-context-compact/
-│   │   ├── README.md
-│   │   └── code.py
-│   ├── 09-memory/
-│   │   ├── README.md
-│   │   └── code.py
-│   ├── 10-tasks/
-│   │   ├── README.md
-│   │   └── code.py
-│   ├── 11-background-tasks/
-│   │   ├── README.md
-│   │   └── code.py
-│   ├── 12-cron-scheduler/
-│   │   ├── README.md
-│   │   └── code.py
-│   ├── 13-agent-teams/
-│   │   ├── README.md
-│   │   └── code.py
-│   ├── 14-mcp-plugin/
-│   │   ├── README.md
-│   │   └── code.py
-│   ├── 15-integrated-harness/
-│   │   ├── README.md
-│   │   └── code.py
-│   ├── 16-workflow-runtime/
-│   │   ├── README.md
-│   │   └── code.py
-│   └── 17-goal-loop/
-│       ├── README.md
-│       └── code.py
+│   │   ├── agent.py      # Agent 内核 + 扩展接口
+│   │   ├── server.py     # 网页界面的后端，--lab / --ext 加载扩展
+│   │   ├── observability.py # 可选的 Phoenix 事件追踪桥
+│   │   └── web/          # 前端页面
+│   ├── 02-memory/        # 每个实战：extension.py + README.md，需要时带一个 demo/
+│   ├── 03-subagent/
+│   ├── 04-mcp/           # 另有 notes_server.py 和 notes/
+│   ├── 05-verify/
+│   ├── 06-observability/ # Phoenix Compose 配置、演示工作区和实战截图
+│   ├── 07-context-management/ # 上下文预算与对话压缩
+│   ├── 08-evaluation/    # Phoenix 固定案例集与实验评分
+│   └── 09-skill-loading/ # SKILL.md 与配套的代码审查脚本
 ├── references/
 │   └── README.md         # Agent 项目、记忆系统、协议与评测资料
-└── labs/
-    ├── 01-mini-coding-agent/
-    │   ├── README.md
-    │   ├── agent.py      # Agent 内核 + 扩展接口
-    │   ├── server.py     # 网页界面的后端，--lab / --ext 加载扩展
-    │   ├── observability.py # 可选的 Phoenix 事件追踪桥
-    │   └── web/          # 前端页面
-    ├── 02-memory/        # 每个实战：extension.py + README.md，需要时带一个 demo/
-    ├── 03-subagent/
-    ├── 04-mcp/           # 另有 notes_server.py 和 notes/
-    ├── 05-verify/
-    ├── 06-observability/ # Phoenix Compose 配置、演示工作区和实战截图
-    ├── 07-context-management/ # 上下文预算与对话压缩
-    ├── 08-evaluation/ # Phoenix 固定案例集与实验评分
-    └── 09-skill-loading/ # SKILL.md 与配套的代码审查脚本
+├── .vitepress/           # 文档站配置
+├── pyproject.toml        # Python 依赖，版本锁在 uv.lock
+├── package.json          # 文档站依赖
+└── .env.example
 ```
 
 每个章节都是一个独立的小单元：
@@ -422,6 +351,7 @@ Phoenix 相关依赖放在独立的 uv 依赖组里，基础实战不需要安�
 - 项目协作规范：[Agents.md](./Agents.md)
 - 参考来源：[SOURCES.md](./SOURCES.md)
 - 项目进度：[ROADMAP.md](./ROADMAP.md)
+- 待生成的配图提示词：[IMAGE_PROMPTS.md](./IMAGE_PROMPTS.md)
 
 ---
 

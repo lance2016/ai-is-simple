@@ -5,7 +5,7 @@ const REPO = 'https://github.com/lance2016/ai-is-simple'
 const ROOT = path.resolve(__dirname, '..')
 
 // Markdown files that live in the repo but are not course pages.
-const NOT_PAGES = ['Agents.md', 'STYLE_GUIDE.md', 'SOURCES.md', 'ROADMAP.md']
+const NOT_PAGES = ['Agents.md', 'STYLE_GUIDE.md', 'SOURCES.md', 'ROADMAP.md', 'IMAGE_PROMPTS.md']
 
 // Relative links to code files or non-page docs have no page on the site,
 // so point them at GitHub instead of producing dead links.

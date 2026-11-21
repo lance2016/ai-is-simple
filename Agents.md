@@ -45,6 +45,7 @@
 - 每一章的首页主视觉必须使用 ImageGen 工具生成或编辑，不能直接用 Mermaid 作为最终主图；后续生成章节时不要跳过 ImageGen。
 - 所有章节主图统一放在根目录 `assets/`，文件名必须带章节编号和主题，例如 `chapter-02-tool-use.png`，不要在章节目录下再创建图片目录。
 - 实战篇封面图统一放在根目录 `assets/`，使用 `lab-NN-topic.png` 命名，例如 `lab-01-mini-coding-agent.png`。
+- 暂时没法生成的图，先把可直接粘贴的提示词写进根目录 `IMAGE_PROMPTS.md`，并在对应 README 的放图位置留一行 `<!-- TODO(image) -->` 注释；不要用 Mermaid 临时顶替。
 - 每一章只保留一张主图，避免两张表达同一概念的图重复出现。
 - 优先使用已经确认过的、简洁、克制、信息层级清楚的教学图。
 - 新章节配图生成时，优先参考已经确认的章节主图保持系列统一；当前系列参考图为 `assets/chapter-01-agent-loop.png`。
